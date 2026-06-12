@@ -1,0 +1,140 @@
+# syntax=docker/dockerfile:1
+# ── Stage 1: build ────────────────────────────────────────────────────────────
+FROM node:24-alpine AS builder
+
+# Pin pnpm to 9.x to avoid the minimumReleaseAge audit policy in pnpm 10+
+RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
+
+WORKDIR /build
+
+# Copy manifests first for layer caching
+COPY package.json pnpm-lock.yaml ./
+
+# Install all deps (devDeps needed for build + esbuild)
+RUN pnpm install --frozen-lockfile
+
+# Copy source
+COPY . .
+
+# Build the app (outputs to dist/)
+RUN pnpm build
+
+# Vite bundles @opentelemetry/api (an optional peer dep of better-auth) as an
+# empty stub when the package is not installed.  better-auth's dynamic import
+# then resolves to {} instead of failing, so getOpenTelemetryAPI() returns {}
+# instead of the noopOpenTelemetryAPI fallback, causing TypeError at runtime.
+# Fix: replace the empty stub with a module that throws, so the .catch handler
+# in better-auth keeps openTelemetryAPI=undefined and uses the noop instead.
+RUN node --input-type=module << 'PATCH_EOF'
+import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+const dir = 'dist/server/assets';
+for (const f of readdirSync(dir)) {
+  if (!f.endsWith('.js')) continue;
+  const p = join(dir, f);
+  const src = readFileSync(p, 'utf8').trim();
+  if (src === 'const core = {};\nexport {\n  core as default\n};') {
+    writeFileSync(p, 'throw new Error("@opentelemetry/api not available");\n');
+    console.log('Patched otel stub:', f);
+  }
+}
+PATCH_EOF
+
+# Compile the migrator to plain JS using esbuild (available via tsx's deps).
+# The runtime image runs the compiled .mjs with node — no TypeScript tooling needed.
+RUN node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/bin/esbuild \
+      scripts/migrate.ts \
+      --bundle \
+      --platform=node \
+      --format=esm \
+      --outfile=scripts/migrate.mjs \
+      --external:postgres \
+      --external:drizzle-orm
+
+# Create the HTTP server entry that wraps the TanStack Start fetch handler.
+# Uses Node.js built-in http module — no extra runtime deps needed.
+RUN cat > scripts/serve.mjs << 'EOF'
+import http from 'node:http';
+import { Readable } from 'node:stream';
+import handler from '/app/dist/server/server.js';
+
+const port = Number(process.env.PORT ?? 3000);
+const host = process.env.HOST ?? '0.0.0.0';
+
+const server = http.createServer(async (req, res) => {
+  const proto = req.headers['x-forwarded-proto'] ?? 'http';
+  const hostHeader = req.headers['x-forwarded-host'] ?? req.headers.host ?? 'localhost';
+  const url = `${proto}://${hostHeader}${req.url}`;
+
+  const chunks = [];
+  for await (const chunk of req) chunks.push(chunk);
+  const body = chunks.length > 0 ? Buffer.concat(chunks) : null;
+
+  const headers = [];
+  for (let i = 0; i < req.rawHeaders.length; i += 2) {
+    headers.push([req.rawHeaders[i], req.rawHeaders[i + 1]]);
+  }
+
+  const webReq = new Request(url, {
+    method: req.method,
+    headers,
+    body: body && body.length > 0 ? body : undefined,
+    duplex: 'half',
+  });
+
+  let webRes;
+  try {
+    webRes = await handler.fetch(webReq);
+  } catch (err) {
+    console.error('Handler error:', err);
+    res.writeHead(500);
+    res.end('Internal Server Error');
+    return;
+  }
+
+  res.statusCode = webRes.status;
+  for (const [k, v] of webRes.headers) {
+    res.setHeader(k, v);
+  }
+
+  if (webRes.body) {
+    Readable.fromWeb(webRes.body).pipe(res);
+  } else {
+    res.end();
+  }
+});
+
+server.listen(port, host, () => {
+  console.log(`Spoor listening on http://${host}:${port}`);
+});
+EOF
+
+# ── Stage 2: runtime ──────────────────────────────────────────────────────────
+FROM node:24-alpine AS runtime
+
+# Non-root user
+RUN addgroup -S spoor && adduser -S spoor -G spoor
+
+WORKDIR /app
+
+# Copy build artefacts
+COPY --from=builder /build/dist ./dist
+COPY --from=builder /build/drizzle ./drizzle
+COPY --from=builder /build/scripts/migrate.mjs ./scripts/migrate.mjs
+COPY --from=builder /build/scripts/serve.mjs ./scripts/serve.mjs
+COPY --from=builder /build/scripts/start.sh ./scripts/start.sh
+
+# Install production dependencies only
+COPY package.json pnpm-lock.yaml ./
+RUN corepack enable && corepack prepare pnpm@9.15.9 --activate \
+    && pnpm install --frozen-lockfile --prod \
+    && chmod +x /app/scripts/start.sh
+
+USER spoor
+
+ENV NODE_ENV=production
+ENV PORT=3000
+
+EXPOSE 3000
+
+ENTRYPOINT ["/app/scripts/start.sh"]
