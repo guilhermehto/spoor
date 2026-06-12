@@ -96,10 +96,20 @@ function DashboardIndex() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
+                  <Button variant="default" size="sm" asChild>
+                    <Link
+                      to="/dashboard/$projectId"
+                      params={{ projectId: project.id }}
+                      search={{ from: undefined, to: undefined }}
+                    >
+                      Overview
+                    </Link>
+                  </Button>
                   <Button variant="outline" size="sm" asChild>
                     <Link
                       to="/dashboard/$projectId/setup"
                       params={{ projectId: project.id }}
+                      search={{ from: undefined, to: undefined }}
                     >
                       Setup
                     </Link>
