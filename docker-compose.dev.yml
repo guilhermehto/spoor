@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: spoor-dev-postgres
+    environment:
+      POSTGRES_USER: spoor
+      POSTGRES_PASSWORD: spoor
+      POSTGRES_DB: spoor
+    ports:
+      - "5433:5432"
+    volumes:
+      - spoor-dev-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U spoor -d spoor"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  spoor-dev-data:
