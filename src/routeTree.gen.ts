@@ -19,6 +19,7 @@ import { Route as ApiIngestRouteImport } from './routes/api/ingest'
 import { Route as DashboardProjectIdRouteRouteImport } from './routes/dashboard/$projectId/route'
 import { Route as DashboardProjectIdIndexRouteImport } from './routes/dashboard/$projectId/index'
 import { Route as DashboardProjectIdSetupRouteImport } from './routes/dashboard/$projectId/setup'
+import { Route as DashboardProjectIdSessionsRouteImport } from './routes/dashboard/$projectId/sessions'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
 const RegisterRoute = RegisterRouteImport.update({
@@ -71,6 +72,12 @@ const DashboardProjectIdSetupRoute = DashboardProjectIdSetupRouteImport.update({
   path: '/setup',
   getParentRoute: () => DashboardProjectIdRouteRoute,
 } as any)
+const DashboardProjectIdSessionsRoute =
+  DashboardProjectIdSessionsRouteImport.update({
+    id: '/sessions',
+    path: '/sessions',
+    getParentRoute: () => DashboardProjectIdRouteRoute,
+  } as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -87,6 +94,7 @@ export interface FileRoutesByFullPath {
   '/api/ingest': typeof ApiIngestRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/dashboard/$projectId/sessions': typeof DashboardProjectIdSessionsRoute
   '/dashboard/$projectId/setup': typeof DashboardProjectIdSetupRoute
   '/dashboard/$projectId/': typeof DashboardProjectIdIndexRoute
 }
@@ -98,6 +106,7 @@ export interface FileRoutesByTo {
   '/api/ingest': typeof ApiIngestRoute
   '/dashboard': typeof DashboardIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/dashboard/$projectId/sessions': typeof DashboardProjectIdSessionsRoute
   '/dashboard/$projectId/setup': typeof DashboardProjectIdSetupRoute
   '/dashboard/$projectId': typeof DashboardProjectIdIndexRoute
 }
@@ -112,6 +121,7 @@ export interface FileRoutesById {
   '/api/ingest': typeof ApiIngestRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/dashboard/$projectId/sessions': typeof DashboardProjectIdSessionsRoute
   '/dashboard/$projectId/setup': typeof DashboardProjectIdSetupRoute
   '/dashboard/$projectId/': typeof DashboardProjectIdIndexRoute
 }
@@ -127,6 +137,7 @@ export interface FileRouteTypes {
     | '/api/ingest'
     | '/dashboard/'
     | '/api/auth/$'
+    | '/dashboard/$projectId/sessions'
     | '/dashboard/$projectId/setup'
     | '/dashboard/$projectId/'
   fileRoutesByTo: FileRoutesByTo
@@ -138,6 +149,7 @@ export interface FileRouteTypes {
     | '/api/ingest'
     | '/dashboard'
     | '/api/auth/$'
+    | '/dashboard/$projectId/sessions'
     | '/dashboard/$projectId/setup'
     | '/dashboard/$projectId'
   id:
@@ -151,6 +163,7 @@ export interface FileRouteTypes {
     | '/api/ingest'
     | '/dashboard/'
     | '/api/auth/$'
+    | '/dashboard/$projectId/sessions'
     | '/dashboard/$projectId/setup'
     | '/dashboard/$projectId/'
   fileRoutesById: FileRoutesById
@@ -237,6 +250,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardProjectIdSetupRouteImport
       parentRoute: typeof DashboardProjectIdRouteRoute
     }
+    '/dashboard/$projectId/sessions': {
+      id: '/dashboard/$projectId/sessions'
+      path: '/sessions'
+      fullPath: '/dashboard/$projectId/sessions'
+      preLoaderRoute: typeof DashboardProjectIdSessionsRouteImport
+      parentRoute: typeof DashboardProjectIdRouteRoute
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -248,12 +268,14 @@ declare module '@tanstack/react-router' {
 }
 
 interface DashboardProjectIdRouteRouteChildren {
+  DashboardProjectIdSessionsRoute: typeof DashboardProjectIdSessionsRoute
   DashboardProjectIdSetupRoute: typeof DashboardProjectIdSetupRoute
   DashboardProjectIdIndexRoute: typeof DashboardProjectIdIndexRoute
 }
 
 const DashboardProjectIdRouteRouteChildren: DashboardProjectIdRouteRouteChildren =
   {
+    DashboardProjectIdSessionsRoute: DashboardProjectIdSessionsRoute,
     DashboardProjectIdSetupRoute: DashboardProjectIdSetupRoute,
     DashboardProjectIdIndexRoute: DashboardProjectIdIndexRoute,
   }

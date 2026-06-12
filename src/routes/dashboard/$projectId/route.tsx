@@ -71,6 +71,16 @@ function ProjectLayout() {
           </Button>
           <Button variant="ghost" size="sm" asChild>
             <Link
+              to="/dashboard/$projectId/sessions"
+              params={{ projectId: project.id }}
+              search={{ from, to }}
+              activeProps={{ className: "font-semibold" }}
+            >
+              Sessions
+            </Link>
+          </Button>
+          <Button variant="ghost" size="sm" asChild>
+            <Link
               to="/dashboard/$projectId/setup"
               params={{ projectId: project.id }}
               search={{ from, to }}

@@ -27,6 +27,15 @@ import {
 // Re-export DateRange so callers only need one import.
 export type { DateRange };
 
+// JSON-safe value type — used for event props so createServerFn can serialize it.
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonValue[]
+  | { [key: string]: JsonValue };
+
 type DB = PostgresJsDatabase<typeof schema>;
 
 // ── Ownership guard ───────────────────────────────────────────────────────────
@@ -324,7 +333,7 @@ export interface SessionEvent {
   path: string;
   host: string;
   referrer: string;
-  props: unknown;
+  props: { [key: string]: JsonValue } | null;
   createdAt: Date;
   /** Milliseconds since session start. */
   offsetMs: number;
@@ -374,6 +383,7 @@ export async function querySessionTimeline(
 
   return rows.map((r) => ({
     ...r,
+    props: r.props as { [key: string]: JsonValue } | null,
     offsetMs: r.createdAt.getTime() - sessionStart.getTime(),
   }));
 }

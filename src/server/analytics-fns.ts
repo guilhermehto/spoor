@@ -15,11 +15,16 @@ import {
   queryTopPages,
   queryTopReferrers,
   queryEventCounts,
+  querySessions,
+  querySessionTimeline,
   type DateRange,
   type TimeSeriesBucket,
   type TopPage,
   type TopReferrer,
   type EventCount,
+  type SessionSummary,
+  type SessionEvent,
+  type JsonValue,
 } from "./analytics";
 
 async function requireSession() {
@@ -63,4 +68,64 @@ export const getOverviewFn = createServerFn({ method: "GET" })
     ]);
 
     return { timeSeries, topPages, topReferrers, eventCounts };
+  });
+
+// ── Sessions list ─────────────────────────────────────────────────────────────
+
+interface SessionsInput {
+  projectId: string;
+  from: string;
+  to: string;
+  offset?: number;
+}
+
+export interface SessionsData {
+  sessions: SessionSummary[];
+  offset: number;
+  hasMore: boolean;
+}
+
+const PAGE_SIZE = 50;
+
+export const getSessionsFn = createServerFn({ method: "GET" })
+  .validator((data: SessionsInput) => data)
+  .handler(async ({ data }): Promise<SessionsData> => {
+    const session = await requireSession();
+    await requireOwnedProject(db, data.projectId, session.user.id);
+
+    const range: DateRange = {
+      from: new Date(data.from),
+      to: new Date(data.to),
+    };
+    const offset = data.offset ?? 0;
+
+    // Fetch one extra to detect whether more pages exist.
+    const rows = await querySessions(db, data.projectId, range, {
+      limit: PAGE_SIZE + 1,
+      offset,
+    });
+
+    const hasMore = rows.length > PAGE_SIZE;
+    return {
+      sessions: hasMore ? rows.slice(0, PAGE_SIZE) : rows,
+      offset,
+      hasMore,
+    };
+  });
+
+// ── Session timeline ──────────────────────────────────────────────────────────
+
+interface TimelineInput {
+  projectId: string;
+  sessionId: string;
+}
+
+export type { SessionSummary, SessionEvent };
+
+export const getSessionTimelineFn = createServerFn({ method: "GET" })
+  .validator((data: TimelineInput) => data)
+  .handler(async ({ data }): Promise<SessionEvent[]> => {
+    const session = await requireSession();
+    await requireOwnedProject(db, data.projectId, session.user.id);
+    return querySessionTimeline(db, data.projectId, data.sessionId);
   });
