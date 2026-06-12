@@ -14,6 +14,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as DashboardRouteRouteImport } from './routes/dashboard/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard/index'
+import { Route as ApiIngestRouteImport } from './routes/api/ingest'
 import { Route as DashboardProjectIdRouteRouteImport } from './routes/dashboard/$projectId/route'
 import { Route as DashboardProjectIdSetupRouteImport } from './routes/dashboard/$projectId/setup'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
@@ -43,6 +44,11 @@ const DashboardIndexRoute = DashboardIndexRouteImport.update({
   path: '/',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
+const ApiIngestRoute = ApiIngestRouteImport.update({
+  id: '/api/ingest',
+  path: '/api/ingest',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardProjectIdRouteRoute = DashboardProjectIdRouteRouteImport.update({
   id: '/$projectId',
   path: '/$projectId',
@@ -65,6 +71,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/dashboard/$projectId': typeof DashboardProjectIdRouteRouteWithChildren
+  '/api/ingest': typeof ApiIngestRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/dashboard/$projectId/setup': typeof DashboardProjectIdSetupRoute
@@ -74,6 +81,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/dashboard/$projectId': typeof DashboardProjectIdRouteRouteWithChildren
+  '/api/ingest': typeof ApiIngestRoute
   '/dashboard': typeof DashboardIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/dashboard/$projectId/setup': typeof DashboardProjectIdSetupRoute
@@ -85,6 +93,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/dashboard/$projectId': typeof DashboardProjectIdRouteRouteWithChildren
+  '/api/ingest': typeof ApiIngestRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/dashboard/$projectId/setup': typeof DashboardProjectIdSetupRoute
@@ -97,6 +106,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/dashboard/$projectId'
+    | '/api/ingest'
     | '/dashboard/'
     | '/api/auth/$'
     | '/dashboard/$projectId/setup'
@@ -106,6 +116,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/dashboard/$projectId'
+    | '/api/ingest'
     | '/dashboard'
     | '/api/auth/$'
     | '/dashboard/$projectId/setup'
@@ -116,6 +127,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/dashboard/$projectId'
+    | '/api/ingest'
     | '/dashboard/'
     | '/api/auth/$'
     | '/dashboard/$projectId/setup'
@@ -126,6 +138,7 @@ export interface RootRouteChildren {
   DashboardRouteRoute: typeof DashboardRouteRouteWithChildren
   LoginRoute: typeof LoginRoute
   RegisterRoute: typeof RegisterRoute
+  ApiIngestRoute: typeof ApiIngestRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
@@ -165,6 +178,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/dashboard/'
       preLoaderRoute: typeof DashboardIndexRouteImport
       parentRoute: typeof DashboardRouteRoute
+    }
+    '/api/ingest': {
+      id: '/api/ingest'
+      path: '/api/ingest'
+      fullPath: '/api/ingest'
+      preLoaderRoute: typeof ApiIngestRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/dashboard/$projectId': {
       id: '/dashboard/$projectId'
@@ -223,6 +243,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRouteRoute: DashboardRouteRouteWithChildren,
   LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,
+  ApiIngestRoute: ApiIngestRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 export const routeTree = rootRouteImport
