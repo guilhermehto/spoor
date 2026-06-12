@@ -52,16 +52,66 @@ RUN node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/bin/esbuild \
       --external:drizzle-orm
 
 # Create the HTTP server entry that wraps the TanStack Start fetch handler.
-# Uses Node.js built-in http module — no extra runtime deps needed.
+# Uses Node.js built-in http/fs modules — no extra runtime deps needed.
+# Static files under dist/client (assets/, spoor.js, favicon.ico, etc.) are
+# served directly; all other requests are forwarded to the TanStack handler.
 RUN cat > scripts/serve.mjs << 'EOF'
 import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
 import { Readable } from 'node:stream';
+import { fileURLToPath } from 'node:url';
 import handler from '/app/dist/server/server.js';
 
 const port = Number(process.env.PORT ?? 3000);
 const host = process.env.HOST ?? '0.0.0.0';
 
+const clientDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'client');
+
+const MIME = {
+  '.js':   'application/javascript; charset=utf-8',
+  '.mjs':  'application/javascript; charset=utf-8',
+  '.css':  'text/css; charset=utf-8',
+  '.html': 'text/html; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.ico':  'image/x-icon',
+  '.png':  'image/png',
+  '.svg':  'image/svg+xml',
+  '.woff': 'font/woff',
+  '.woff2':'font/woff2',
+};
+
+function serveStatic(urlPath, res) {
+  // Resolve the filesystem path; reject any path traversal attempts.
+  const rel = decodeURIComponent(urlPath);
+  const abs = path.resolve(clientDir, '.' + rel);
+  if (!abs.startsWith(clientDir + path.sep) && abs !== clientDir) {
+    res.writeHead(403);
+    res.end('Forbidden');
+    return true;
+  }
+  let stat;
+  try { stat = fs.statSync(abs); } catch { return false; }
+  if (!stat.isFile()) return false;
+  const ext = path.extname(abs).toLowerCase();
+  const mime = MIME[ext] ?? 'application/octet-stream';
+  // Hashed assets are immutable; public files get a short cache.
+  const isHashed = /\/assets\//.test(rel);
+  res.writeHead(200, {
+    'Content-Type': mime,
+    'Cache-Control': isHashed ? 'public, max-age=31536000, immutable' : 'public, max-age=3600',
+    'Content-Length': stat.size,
+  });
+  fs.createReadStream(abs).pipe(res);
+  return true;
+}
+
 const server = http.createServer(async (req, res) => {
+  const urlPath = (req.url ?? '/').split('?')[0];
+
+  // Serve static client assets before hitting the SSR handler.
+  if (serveStatic(urlPath, res)) return;
+
   const proto = req.headers['x-forwarded-proto'] ?? 'http';
   const hostHeader = req.headers['x-forwarded-host'] ?? req.headers.host ?? 'localhost';
   const url = `${proto}://${hostHeader}${req.url}`;
