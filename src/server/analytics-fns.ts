@@ -13,6 +13,7 @@ import {
   requireOwnedProject,
   queryTimeSeries,
   queryUniqueVisitors,
+  queryErrorCount,
   queryTopPages,
   queryTopReferrers,
   queryEventCounts,
@@ -47,6 +48,8 @@ export interface OverviewData {
   timeSeries: TimeSeriesBucket[];
   /** Range-wide distinct visitor count (headline card). */
   uniqueVisitors: number;
+  /** Range-wide error-event count (headline card). */
+  errorCount: number;
   topPages: TopPage[];
   topReferrers: TopReferrer[];
   eventCounts: EventCount[];
@@ -63,15 +66,17 @@ export const getOverviewFn = createServerFn({ method: "GET" })
       to: new Date(data.to),
     };
 
-    const [timeSeries, uniqueVisitors, topPages, topReferrers, eventCounts] = await Promise.all([
-      queryTimeSeries(db, data.projectId, range),
-      queryUniqueVisitors(db, data.projectId, range),
-      queryTopPages(db, data.projectId, range),
-      queryTopReferrers(db, data.projectId, range),
-      queryEventCounts(db, data.projectId, range),
-    ]);
+    const [timeSeries, uniqueVisitors, errorCount, topPages, topReferrers, eventCounts] =
+      await Promise.all([
+        queryTimeSeries(db, data.projectId, range),
+        queryUniqueVisitors(db, data.projectId, range),
+        queryErrorCount(db, data.projectId, range),
+        queryTopPages(db, data.projectId, range),
+        queryTopReferrers(db, data.projectId, range),
+        queryEventCounts(db, data.projectId, range),
+      ]);
 
-    return { timeSeries, uniqueVisitors, topPages, topReferrers, eventCounts };
+    return { timeSeries, uniqueVisitors, errorCount, topPages, topReferrers, eventCounts };
   });
 
 // ── Sessions list ─────────────────────────────────────────────────────────────

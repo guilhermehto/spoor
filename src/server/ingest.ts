@@ -3,8 +3,9 @@
  *
  * Wire payload shape (short keys for sendBeacon compactness):
  *   k  — project public_key (string, required)
- *   t  — event type: "pageview" | "click" | "custom" (string, required)
- *   n  — event name, e.g. "signup-cta" (string, optional; required for click/custom)
+ *   t  — event type: "pageview" | "click" | "custom" | "error" (string, required)
+ *   n  — event name, e.g. "signup-cta"; carries the message for error events
+ *        (string, optional; required for click/custom)
  *   p  — page path, e.g. "/pricing" (string, required)
  *   h  — page hostname, e.g. "example.com" (string, required)
  *   r  — referrer URL (string, optional)
@@ -35,7 +36,7 @@ const MAX_PATH_LEN = 512;
 const MAX_NAME_LEN = 512;
 const MAX_PROPS_SERIALIZED = 2 * 1024; // 2 KB
 
-const VALID_TYPES = new Set(["pageview", "click", "custom"]);
+const VALID_TYPES = new Set(["pageview", "click", "custom", "error"]);
 
 /** Basic bot detection — matches common crawler/bot user-agent substrings. */
 const BOT_UA_RE =
