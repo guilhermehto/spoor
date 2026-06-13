@@ -88,6 +88,31 @@ export async function queryUniqueVisitors(
   return Number(row?.visitors ?? 0);
 }
 
+// ── Range-wide error count ────────────────────────────────────────────────────
+
+/**
+ * Returns the total number of error events (t = "error") across the [from, to]
+ * range for a project.  Powers the headline "Errors" card.
+ */
+export async function queryErrorCount(
+  db: DB,
+  projectId: string,
+  range: DateRange,
+): Promise<number> {
+  const [row] = await db
+    .select({ total: count(analyticsEvents.id).as("total") })
+    .from(analyticsEvents)
+    .where(
+      and(
+        eq(analyticsEvents.projectId, projectId),
+        eq(analyticsEvents.type, "error"),
+        gte(analyticsEvents.createdAt, range.from),
+        lte(analyticsEvents.createdAt, range.to),
+      ),
+    );
+  return Number(row?.total ?? 0);
+}
+
 // ── Time-series: pageviews + unique visitors per bucket ───────────────────────
 
 export interface TimeSeriesBucket {
