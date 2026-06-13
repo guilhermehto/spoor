@@ -23,6 +23,7 @@ import {
   pgDateTruncUnit,
   type DateRange,
 } from "./analytics-buckets";
+import { resolveEventConstraints, type EventFilters } from "~/lib/event-filters";
 
 // Re-export DateRange so callers only need one import.
 export type { DateRange };
@@ -70,7 +71,9 @@ export async function queryUniqueVisitors(
   db: DB,
   projectId: string,
   range: DateRange,
+  filters: EventFilters = {},
 ): Promise<number> {
+  const constraints = resolveEventConstraints(filters);
   const [row] = await db
     .select({
       visitors: countDistinct(analyticsSessions.visitorHash).as("visitors"),
@@ -80,9 +83,11 @@ export async function queryUniqueVisitors(
     .where(
       and(
         eq(analyticsEvents.projectId, projectId),
-        eq(analyticsEvents.type, "pageview"),
         gte(analyticsEvents.createdAt, range.from),
         lte(analyticsEvents.createdAt, range.to),
+        constraints.type !== undefined ? eq(analyticsEvents.type, constraints.type) : undefined,
+        constraints.path !== undefined ? eq(analyticsEvents.path, constraints.path) : undefined,
+        constraints.name !== undefined ? eq(analyticsEvents.name, constraints.name) : undefined,
       ),
     );
   return Number(row?.visitors ?? 0);
@@ -108,11 +113,14 @@ export async function queryTimeSeries(
   db: DB,
   projectId: string,
   range: DateRange,
+  filters: EventFilters = {},
 ): Promise<TimeSeriesBucket[]> {
   const granularity = bucketGranularity(range);
   const truncUnit = pgDateTruncUnit(granularity);
   // date_trunc requires a literal string unit — use sql.raw to avoid parameterization.
   const bucketExpr = sql<string>`date_trunc(${sql.raw(`'${truncUnit}'`)}, ${analyticsEvents.createdAt} AT TIME ZONE 'UTC')`;
+
+  const constraints = resolveEventConstraints(filters);
 
   // Raw query: join events → sessions to get visitor_hash, group by bucket.
   const rows = await db
@@ -126,9 +134,11 @@ export async function queryTimeSeries(
     .where(
       and(
         eq(analyticsEvents.projectId, projectId),
-        eq(analyticsEvents.type, "pageview"),
         gte(analyticsEvents.createdAt, range.from),
         lte(analyticsEvents.createdAt, range.to),
+        constraints.type !== undefined ? eq(analyticsEvents.type, constraints.type) : undefined,
+        constraints.path !== undefined ? eq(analyticsEvents.path, constraints.path) : undefined,
+        constraints.name !== undefined ? eq(analyticsEvents.name, constraints.name) : undefined,
       ),
     )
     .groupBy(bucketExpr)
@@ -169,8 +179,12 @@ export async function queryTopPages(
   db: DB,
   projectId: string,
   range: DateRange,
-  limit = 10,
+  opts: { limit?: number; offset?: number; filters?: EventFilters } = {},
 ): Promise<TopPage[]> {
+  const limit = opts.limit ?? 10;
+  const offset = opts.offset ?? 0;
+  const constraints = resolveEventConstraints(opts.filters ?? {});
+
   const rows = await db
     .select({
       path: analyticsEvents.path,
@@ -180,14 +194,17 @@ export async function queryTopPages(
     .where(
       and(
         eq(analyticsEvents.projectId, projectId),
-        eq(analyticsEvents.type, "pageview"),
         gte(analyticsEvents.createdAt, range.from),
         lte(analyticsEvents.createdAt, range.to),
+        constraints.type !== undefined ? eq(analyticsEvents.type, constraints.type) : undefined,
+        constraints.path !== undefined ? eq(analyticsEvents.path, constraints.path) : undefined,
+        constraints.name !== undefined ? eq(analyticsEvents.name, constraints.name) : undefined,
       ),
     )
     .groupBy(analyticsEvents.path)
-    .orderBy(desc(count(analyticsEvents.id)))
-    .limit(limit);
+    .orderBy(desc(count(analyticsEvents.id)), asc(analyticsEvents.path))
+    .limit(limit)
+    .offset(offset);
 
   return rows.map((r) => ({ path: r.path, views: Number(r.views) }));
 }
@@ -211,8 +228,12 @@ export async function queryTopReferrers(
   db: DB,
   projectId: string,
   range: DateRange,
-  limit = 10,
+  opts: { limit?: number; offset?: number; filters?: EventFilters } = {},
 ): Promise<TopReferrer[]> {
+  const limit = opts.limit ?? 10;
+  const offset = opts.offset ?? 0;
+  const constraints = resolveEventConstraints(opts.filters ?? {});
+
   // Exclude rows where referrer is empty or where the referrer host equals the
   // page host.  We use a Postgres expression to extract the host from the
   // referrer URL: regexp_replace to strip the scheme and path.
@@ -225,9 +246,11 @@ export async function queryTopReferrers(
     .where(
       and(
         eq(analyticsEvents.projectId, projectId),
-        eq(analyticsEvents.type, "pageview"),
         gte(analyticsEvents.createdAt, range.from),
         lte(analyticsEvents.createdAt, range.to),
+        constraints.type !== undefined ? eq(analyticsEvents.type, constraints.type) : undefined,
+        constraints.path !== undefined ? eq(analyticsEvents.path, constraints.path) : undefined,
+        constraints.name !== undefined ? eq(analyticsEvents.name, constraints.name) : undefined,
         // Exclude empty referrers
         ne(analyticsEvents.referrer, ""),
         // Exclude self-referrals: referrer host ≠ event host
@@ -236,8 +259,9 @@ export async function queryTopReferrers(
       ),
     )
     .groupBy(analyticsEvents.referrer)
-    .orderBy(desc(count(analyticsEvents.id)))
-    .limit(limit);
+    .orderBy(desc(count(analyticsEvents.id)), asc(analyticsEvents.referrer))
+    .limit(limit)
+    .offset(offset);
 
   return rows.map((r) => ({ referrer: r.referrer, views: Number(r.views) }));
 }
@@ -252,13 +276,23 @@ export interface EventCount {
 
 /**
  * Returns click and custom event names with their counts within the date range.
+ *
+ * The base constraint is always `type IN ('click', 'custom')`.  If `filters`
+ * includes a `type` or `name`, those are intersected directly (a
+ * `type='pageview'` filter will yield an empty result, which is intended).
+ * `resolveEventConstraints` is NOT used here — the pageview-default rule does
+ * not apply to the events list.
  */
 export async function queryEventCounts(
   db: DB,
   projectId: string,
   range: DateRange,
-  limit = 20,
+  opts: { limit?: number; offset?: number; filters?: EventFilters } = {},
 ): Promise<EventCount[]> {
+  const limit = opts.limit ?? 20;
+  const offset = opts.offset ?? 0;
+  const filters = opts.filters ?? {};
+
   const rows = await db
     .select({
       name: analyticsEvents.name,
@@ -272,11 +306,15 @@ export async function queryEventCounts(
         sql`${analyticsEvents.type} IN ('click', 'custom')`,
         gte(analyticsEvents.createdAt, range.from),
         lte(analyticsEvents.createdAt, range.to),
+        filters.path !== undefined ? eq(analyticsEvents.path, filters.path) : undefined,
+        filters.type !== undefined ? eq(analyticsEvents.type, filters.type) : undefined,
+        filters.name !== undefined ? eq(analyticsEvents.name, filters.name) : undefined,
       ),
     )
     .groupBy(analyticsEvents.name, analyticsEvents.type)
-    .orderBy(desc(count(analyticsEvents.id)))
-    .limit(limit);
+    .orderBy(desc(count(analyticsEvents.id)), asc(analyticsEvents.name), asc(analyticsEvents.type))
+    .limit(limit)
+    .offset(offset);
 
   return rows.map((r) => ({
     name: r.name,
