@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite dev",
+    "dev": "docker compose -f docker-compose.dev.yml up -d --wait && pnpm db:migrate && vite dev",
     "build": "vite build",
     "start": "node .output/server/index.mjs",
     "typecheck": "tsc --noEmit",
