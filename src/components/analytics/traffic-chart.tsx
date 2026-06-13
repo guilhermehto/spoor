@@ -1,5 +1,8 @@
 /**
- * TrafficChart — recharts area chart of page views and unique visitors over time.
+ * TrafficChart — recharts area chart of page views (or events) and unique visitors over time.
+ *
+ * When `eventMode` is true the primary series is labelled "Events" and the
+ * empty-state copy reflects that; the default ("Views") is unchanged.
  */
 
 import {
@@ -16,6 +19,8 @@ import type { TimeSeriesBucket } from "~/server/analytics";
 
 interface TrafficChartProps {
   data: TimeSeriesBucket[];
+  /** When true, relabels the primary series as "Events" (event-filter active). */
+  eventMode?: boolean;
 }
 
 function formatBucketLabel(bucket: string): string {
@@ -37,20 +42,22 @@ function formatBucketLabel(bucket: string): string {
   return d.toLocaleString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 }
 
-export function TrafficChart({ data }: TrafficChartProps) {
+export function TrafficChart({ data, eventMode = false }: TrafficChartProps) {
   const isEmpty = data.every((b) => b.views === 0 && b.visitors === 0);
 
   if (isEmpty) {
     return (
       <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
-        No page views in this period.
+        {eventMode ? "No events in this period." : "No page views in this period."}
       </div>
     );
   }
 
+  const primaryKey = eventMode ? "Events" : "Views";
+
   const chartData = data.map((b) => ({
     label: formatBucketLabel(b.bucket),
-    Views: b.views,
+    [primaryKey]: b.views,
     Visitors: b.visitors,
   }));
 
@@ -92,7 +99,7 @@ export function TrafficChart({ data }: TrafficChartProps) {
         <Legend wrapperStyle={{ fontSize: 12 }} />
         <Area
           type="monotone"
-          dataKey="Views"
+          dataKey={primaryKey}
           stroke="hsl(240 5.9% 10%)"
           strokeWidth={2}
           fill="url(#colorViews)"
