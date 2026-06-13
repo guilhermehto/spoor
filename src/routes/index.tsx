@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { Button } from "~/components/ui/button";
 
 export const Route = createFileRoute("/")({
@@ -16,7 +16,9 @@ function HomePage() {
           Self-hosted, privacy-first web analytics.
         </p>
       </div>
-      <Button>Get Started</Button>
+      <Button asChild>
+        <Link to="/login">Get Started</Link>
+      </Button>
     </main>
   );
 }
