@@ -4,6 +4,7 @@
  * Embeds the live spoor.js snippet and provides buttons that exercise all
  * three event types so you can verify rows appear in analytics_events.
  */
+import { useState } from "react";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 
 declare global {
@@ -25,8 +26,25 @@ export const Route = createFileRoute("/demo")({
   component: DemoPage,
 });
 
+interface LogEntry {
+  label: string;
+  status: number;
+  body: string;
+}
+
 function DemoPage() {
   const { key } = Route.useSearch();
+  const [log, setLog] = useState<LogEntry[]>([]);
+
+  function appendLog(entry: LogEntry) {
+    setLog((prev) => [entry, ...prev]);
+  }
+
+  async function postRaw(label: string, body: string) {
+    const res = await fetch("/api/ingest", { method: "POST", body });
+    const text = await res.text();
+    appendLog({ label, status: res.status, body: text });
+  }
 
   const appUrl =
     typeof window !== "undefined"
@@ -235,6 +253,100 @@ function DemoPage() {
               </button>
             ))}
           </div>
+        </section>
+
+        <hr style={{ margin: "1.5rem 0" }} />
+
+        <section>
+          <h2 style={{ fontSize: "1.1rem" }}>5. Error paths</h2>
+          <p style={{ color: "#555", fontSize: "0.9rem" }}>
+            These buttons POST directly to <code>/api/ingest</code> via{" "}
+            <code>fetch</code> (not <code>sendBeacon</code>) and log the HTTP
+            status + response body below.
+          </p>
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+            <button
+              onClick={() => postRaw("malformed payload", "{not json")}
+              style={{
+                padding: "0.5rem 1.25rem",
+                background: "#b91c1c",
+                color: "#fff",
+                border: "none",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontSize: "0.95rem",
+              }}
+            >
+              Malformed payload (→ 400)
+            </button>
+            <button
+              onClick={() =>
+                postRaw(
+                  "unknown key",
+                  JSON.stringify({
+                    k: "does-not-exist",
+                    t: "pageview",
+                    p: "/",
+                    h: "localhost",
+                  }),
+                )
+              }
+              style={{
+                padding: "0.5rem 1.25rem",
+                background: "#92400e",
+                color: "#fff",
+                border: "none",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontSize: "0.95rem",
+              }}
+            >
+              Unknown key (→ 404)
+            </button>
+          </div>
+        </section>
+
+        <hr style={{ margin: "1.5rem 0" }} />
+
+        <section>
+          <h2 style={{ fontSize: "1.1rem" }}>Response log</h2>
+          {log.length === 0 ? (
+            <p style={{ color: "#888", fontSize: "0.9rem" }}>
+              No responses yet — click an error-path button above.
+            </p>
+          ) : (
+            <ul
+              style={{
+                listStyle: "none",
+                padding: 0,
+                margin: 0,
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.5rem",
+              }}
+            >
+              {log.map((entry, i) => (
+                <li
+                  key={i}
+                  style={{
+                    background: entry.status >= 400 ? "#fef2f2" : "#f0fdf4",
+                    border: `1px solid ${entry.status >= 400 ? "#fca5a5" : "#86efac"}`,
+                    borderRadius: "6px",
+                    padding: "0.5rem 0.75rem",
+                    fontSize: "0.85rem",
+                    fontFamily: "monospace",
+                  }}
+                >
+                  <strong style={{ color: entry.status >= 400 ? "#b91c1c" : "#15803d" }}>
+                    {entry.status}
+                  </strong>{" "}
+                  <span style={{ color: "#555" }}>{entry.label}</span>
+                  {" — "}
+                  <span style={{ color: "#374151" }}>{entry.body}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
 
         <hr style={{ margin: "1.5rem 0" }} />
