@@ -32,21 +32,9 @@ function OverviewPage() {
   // Use the range-wide distinct count so a visitor active in N buckets counts once.
   const totalVisitors = data.uniqueVisitors;
 
-  const topPagesItems = data.topPages.map((p: { path: string; views: number }) => ({
-    label: p.path,
-    count: p.views,
-  }));
-
-  const topReferrersItems = data.topReferrers.map((r: { referrer: string; views: number }) => ({
-    label: r.referrer,
-    count: r.views,
-  }));
-
-  const eventCountItems = data.eventCounts.map((e: { name: string; type: string; count: number }) => ({
-    label: e.name,
-    count: e.count,
-    badge: e.type,
-  }));
+  const topPagesItems = data.topPages.items;
+  const topReferrersItems = data.topReferrers.items;
+  const eventCountItems = data.eventCounts.items;
 
   return (
     <div className="space-y-6">
