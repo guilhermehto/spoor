@@ -12,13 +12,14 @@ Self-hosted, cookieless web analytics. Drop one script tag on any site; see page
 
 ## Quick start (local dev)
 
+Requires Docker (for the Postgres container).
+
 ```sh
-cp .env.example .env          # fill in secrets
-docker compose -f docker-compose.dev.yml up -d   # start Postgres on :5433
 pnpm install
-pnpm db:migrate
-pnpm dev                      # http://localhost:5173
+pnpm dev          # boots Postgres on :5433, runs migrations, serves http://localhost:5173
 ```
+
+No `.env` is needed locally — dev uses fallbacks for all secrets and `DATABASE_URL` (matching the dev Postgres). To override, `cp .env.example .env` first.
 
 ## Environment variables
 

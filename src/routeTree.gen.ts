@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as DemoLandingRouteImport } from './routes/demo-landing'
 import { Route as DemoRouteImport } from './routes/demo'
 import { Route as DashboardRouteRouteImport } from './routes/dashboard/route'
 import { Route as IndexRouteImport } from './routes/index'
@@ -30,6 +31,11 @@ const RegisterRoute = RegisterRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DemoLandingRoute = DemoLandingRouteImport.update({
+  id: '/demo-landing',
+  path: '/demo-landing',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DemoRoute = DemoRouteImport.update({
@@ -88,6 +94,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRouteRouteWithChildren
   '/demo': typeof DemoRoute
+  '/demo-landing': typeof DemoLandingRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/dashboard/$projectId': typeof DashboardProjectIdRouteRouteWithChildren
@@ -101,6 +108,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/demo': typeof DemoRoute
+  '/demo-landing': typeof DemoLandingRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/api/ingest': typeof ApiIngestRoute
@@ -115,6 +123,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRouteRouteWithChildren
   '/demo': typeof DemoRoute
+  '/demo-landing': typeof DemoLandingRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/dashboard/$projectId': typeof DashboardProjectIdRouteRouteWithChildren
@@ -131,6 +140,7 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/demo'
+    | '/demo-landing'
     | '/login'
     | '/register'
     | '/dashboard/$projectId'
@@ -144,6 +154,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/demo'
+    | '/demo-landing'
     | '/login'
     | '/register'
     | '/api/ingest'
@@ -157,6 +168,7 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/demo'
+    | '/demo-landing'
     | '/login'
     | '/register'
     | '/dashboard/$projectId'
@@ -172,6 +184,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRouteRoute: typeof DashboardRouteRouteWithChildren
   DemoRoute: typeof DemoRoute
+  DemoLandingRoute: typeof DemoLandingRoute
   LoginRoute: typeof LoginRoute
   RegisterRoute: typeof RegisterRoute
   ApiIngestRoute: typeof ApiIngestRoute
@@ -192,6 +205,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/demo-landing': {
+      id: '/demo-landing'
+      path: '/demo-landing'
+      fullPath: '/demo-landing'
+      preLoaderRoute: typeof DemoLandingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/demo': {
@@ -303,6 +323,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRouteRoute: DashboardRouteRouteWithChildren,
   DemoRoute: DemoRoute,
+  DemoLandingRoute: DemoLandingRoute,
   LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,
   ApiIngestRoute: ApiIngestRoute,
