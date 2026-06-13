@@ -59,6 +59,35 @@ export async function requireOwnedProject(
   }
 }
 
+// ── Range-wide unique visitor count ──────────────────────────────────────────
+
+/**
+ * Returns the count of distinct visitor hashes across the entire [from, to]
+ * range for a project.  Used for the headline "Unique visitors" card so that
+ * a visitor active in multiple time buckets is counted only once.
+ */
+export async function queryUniqueVisitors(
+  db: DB,
+  projectId: string,
+  range: DateRange,
+): Promise<number> {
+  const [row] = await db
+    .select({
+      visitors: countDistinct(analyticsSessions.visitorHash).as("visitors"),
+    })
+    .from(analyticsEvents)
+    .innerJoin(analyticsSessions, eq(analyticsEvents.sessionId, analyticsSessions.id))
+    .where(
+      and(
+        eq(analyticsEvents.projectId, projectId),
+        eq(analyticsEvents.type, "pageview"),
+        gte(analyticsEvents.createdAt, range.from),
+        lte(analyticsEvents.createdAt, range.to),
+      ),
+    );
+  return Number(row?.visitors ?? 0);
+}
+
 // ── Time-series: pageviews + unique visitors per bucket ───────────────────────
 
 export interface TimeSeriesBucket {

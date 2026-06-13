@@ -10,8 +10,9 @@
  * No cookies, no localStorage, no persistent cross-site identity.
  */
 
-const HASH_SECRET =
-  process.env["SPOOR_HASH_SECRET"] ?? "dev-hash-secret-change-me";
+import { SPOOR_HASH_SECRET } from "./config";
+
+const HASH_SECRET = SPOOR_HASH_SECRET;
 
 /** Returns the UTC calendar date string "YYYY-MM-DD" for a given timestamp. */
 export function utcDateString(now: Date): string {

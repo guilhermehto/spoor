@@ -23,17 +23,18 @@ import { Button } from "~/components/ui/button";
 
 // ── Route ─────────────────────────────────────────────────────────────────────
 
-const defaultRange = buildRange("7d");
-
 export const Route = createFileRoute("/dashboard/$projectId/sessions")({
   loaderDeps: ({
     search,
   }: {
     search: { from?: string | undefined; to?: string | undefined };
-  }) => ({
-    from: search.from ?? defaultRange.from,
-    to: search.to ?? defaultRange.to,
-  }),
+  }) => {
+    const defaultRange = buildRange("7d");
+    return {
+      from: search.from ?? defaultRange.from,
+      to: search.to ?? defaultRange.to,
+    };
+  },
   loader: async ({ params, deps }) => {
     return getSessionsFn({
       data: {
@@ -149,16 +150,22 @@ function SessionRow({ session, projectId, isExpanded, onToggle }: SessionRowProp
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-function SessionsPage() {
-  const { projectId } = Route.useParams();
-  const search = Route.useSearch() as { from?: string; to?: string };
-  const initialData = Route.useLoaderData();
+/**
+ * Inner list component.  Keyed on `${from}|${to}` by the parent so React
+ * remounts it (resetting all state) whenever the date range changes.
+ * "Load more" appends within the current range without affecting the key.
+ */
+interface SessionsListProps {
+  projectId: string;
+  from: string;
+  to: string;
+  initialSessions: SessionSummary[];
+  initialHasMore: boolean;
+}
 
-  const from = search.from ?? defaultRange.from;
-  const to = search.to ?? defaultRange.to;
-
-  const [sessions, setSessions] = useState<SessionSummary[]>(initialData.sessions);
-  const [hasMore, setHasMore] = useState(initialData.hasMore);
+function SessionsList({ projectId, from, to, initialSessions, initialHasMore }: SessionsListProps) {
+  const [sessions, setSessions] = useState<SessionSummary[]>(initialSessions);
+  const [hasMore, setHasMore] = useState(initialHasMore);
   const [loadingMore, setLoadingMore] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -185,50 +192,72 @@ function SessionsPage() {
   }
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">
-            Recent sessions
-            {sessions.length > 0 && (
-              <span className="ml-2 text-sm font-normal text-muted-foreground">
-                ({sessions.length}{hasMore ? "+" : ""} shown)
-              </span>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0 px-0">
-          {sessions.length === 0 ? (
-            <p className="px-4 py-4 text-sm text-muted-foreground">
-              No sessions in this date range.
-            </p>
-          ) : (
-            <>
-              {sessions.map((s) => (
-                <SessionRow
-                  key={s.sessionId}
-                  session={s}
-                  projectId={projectId}
-                  isExpanded={expandedId === s.sessionId}
-                  onToggle={() => toggleSession(s.sessionId)}
-                />
-              ))}
-              {hasMore && (
-                <div className="px-4 pt-3">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={loadMore}
-                    disabled={loadingMore}
-                  >
-                    {loadingMore ? "Loading…" : "Load more"}
-                  </Button>
-                </div>
-              )}
-            </>
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">
+          Recent sessions
+          {sessions.length > 0 && (
+            <span className="ml-2 text-sm font-normal text-muted-foreground">
+              ({sessions.length}{hasMore ? "+" : ""} shown)
+            </span>
           )}
-        </CardContent>
-      </Card>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pt-0 px-0">
+        {sessions.length === 0 ? (
+          <p className="px-4 py-4 text-sm text-muted-foreground">
+            No sessions in this date range.
+          </p>
+        ) : (
+          <>
+            {sessions.map((s) => (
+              <SessionRow
+                key={s.sessionId}
+                session={s}
+                projectId={projectId}
+                isExpanded={expandedId === s.sessionId}
+                onToggle={() => toggleSession(s.sessionId)}
+              />
+            ))}
+            {hasMore && (
+              <div className="px-4 pt-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                >
+                  {loadingMore ? "Loading…" : "Load more"}
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function SessionsPage() {
+  const { projectId } = Route.useParams();
+  const search = Route.useSearch() as { from?: string; to?: string };
+  const initialData = Route.useLoaderData();
+
+  const { from: defaultFrom, to: defaultTo } = buildRange("7d");
+  const from = search.from ?? defaultFrom;
+  const to = search.to ?? defaultTo;
+
+  return (
+    <div className="space-y-4">
+      {/* Key on the range so state resets (list + expanded row) when range changes. */}
+      <SessionsList
+        key={`${from}|${to}`}
+        projectId={projectId}
+        from={from}
+        to={to}
+        initialSessions={initialData.sessions}
+        initialHasMore={initialData.hasMore}
+      />
     </div>
   );
 }

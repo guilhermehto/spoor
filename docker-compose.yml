@@ -23,10 +23,10 @@ services:
       - "${PORT:-3000}:3000"
     environment:
       DATABASE_URL: postgres://spoor:${POSTGRES_PASSWORD:-spoor}@db:5432/spoor
-      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET must be set}
       BETTER_AUTH_URL: ${APP_URL:-http://localhost:3000}
       APP_URL: ${APP_URL:-http://localhost:3000}
-      SPOOR_HASH_SECRET: ${SPOOR_HASH_SECRET}
+      SPOOR_HASH_SECRET: ${SPOOR_HASH_SECRET:?SPOOR_HASH_SECRET must be set}
       PORT: "3000"
       NODE_ENV: production
     healthcheck:

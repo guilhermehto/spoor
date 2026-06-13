@@ -5,13 +5,14 @@ import { TrafficChart } from "~/components/analytics/traffic-chart";
 import { RankedList } from "~/components/analytics/ranked-list";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 
-const defaultRange = buildRange("7d");
-
 export const Route = createFileRoute("/dashboard/$projectId/")({
-  loaderDeps: ({ search }: { search: { from?: string | undefined; to?: string | undefined } }) => ({
-    from: search.from ?? defaultRange.from,
-    to: search.to ?? defaultRange.to,
-  }),
+  loaderDeps: ({ search }: { search: { from?: string | undefined; to?: string | undefined } }) => {
+    const defaultRange = buildRange("7d");
+    return {
+      from: search.from ?? defaultRange.from,
+      to: search.to ?? defaultRange.to,
+    };
+  },
   loader: async ({ params, deps }): Promise<OverviewData> => {
     return getOverviewFn({
       data: {
@@ -28,7 +29,8 @@ function OverviewPage() {
   const data = Route.useLoaderData() as OverviewData;
 
   const totalViews = data.timeSeries.reduce((s: number, b: { views: number }) => s + b.views, 0);
-  const totalVisitors = data.timeSeries.reduce((s: number, b: { visitors: number }) => s + b.visitors, 0);
+  // Use the range-wide distinct count so a visitor active in N buckets counts once.
+  const totalVisitors = data.uniqueVisitors;
 
   const topPagesItems = data.topPages.map((p: { path: string; views: number }) => ({
     label: p.path,

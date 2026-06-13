@@ -116,8 +116,26 @@ const server = http.createServer(async (req, res) => {
   const hostHeader = req.headers['x-forwarded-host'] ?? req.headers.host ?? 'localhost';
   const url = `${proto}://${hostHeader}${req.url}`;
 
+  // Cap body accumulation to prevent memory DoS from unbounded request bodies.
+  // 64 KB is generous for any legitimate app POST; ingest has its own 8 KB inner guard.
+  const MAX_REQUEST_BODY = 64 * 1024;
   const chunks = [];
-  for await (const chunk of req) chunks.push(chunk);
+  let accumulated = 0;
+  let bodyTooLarge = false;
+  for await (const chunk of req) {
+    accumulated += chunk.length;
+    if (accumulated > MAX_REQUEST_BODY) {
+      bodyTooLarge = true;
+      req.destroy();
+      break;
+    }
+    chunks.push(chunk);
+  }
+  if (bodyTooLarge) {
+    res.writeHead(413, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'payload too large' }));
+    return;
+  }
   const body = chunks.length > 0 ? Buffer.concat(chunks) : null;
 
   const headers = [];

@@ -15,6 +15,8 @@ import {
 } from "~/server/ingest";
 import { computeVisitorHash, extractClientIp } from "~/server/visitor";
 
+const MAX_BODY_BYTES = 8 * 1024; // 8 KB — must match ingest.ts inner guard
+
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -34,6 +36,15 @@ export const Route = createFileRoute("/api/ingest")({
         if (request.method !== "POST") {
           return new Response(JSON.stringify({ error: "method not allowed" }), {
             status: 405,
+            headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+          });
+        }
+
+        // Reject oversized bodies before buffering — avoids memory DoS.
+        const contentLength = request.headers.get("content-length");
+        if (contentLength !== null && Number(contentLength) > MAX_BODY_BYTES) {
+          return new Response(JSON.stringify({ error: "payload too large" }), {
+            status: 413,
             headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
           });
         }

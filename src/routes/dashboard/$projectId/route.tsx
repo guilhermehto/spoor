@@ -17,8 +17,6 @@ function validateSearch(search: Record<string, unknown>): ProjectSearch {
   };
 }
 
-const defaultRange = buildRange("7d");
-
 export const Route = createFileRoute("/dashboard/$projectId")({
   validateSearch,
   beforeLoad: async ({ params }) => {
@@ -43,6 +41,7 @@ function ProjectLayout() {
   const { project } = Route.useRouteContext();
   const search = Route.useSearch();
 
+  const defaultRange = buildRange("7d");
   const from = search.from ?? defaultRange.from;
   const to = search.to ?? defaultRange.to;
 

@@ -12,6 +12,7 @@ import { db } from "~/db/index";
 import {
   requireOwnedProject,
   queryTimeSeries,
+  queryUniqueVisitors,
   queryTopPages,
   queryTopReferrers,
   queryEventCounts,
@@ -44,6 +45,8 @@ interface OverviewInput {
 
 export interface OverviewData {
   timeSeries: TimeSeriesBucket[];
+  /** Range-wide distinct visitor count (headline card). */
+  uniqueVisitors: number;
   topPages: TopPage[];
   topReferrers: TopReferrer[];
   eventCounts: EventCount[];
@@ -60,14 +63,15 @@ export const getOverviewFn = createServerFn({ method: "GET" })
       to: new Date(data.to),
     };
 
-    const [timeSeries, topPages, topReferrers, eventCounts] = await Promise.all([
+    const [timeSeries, uniqueVisitors, topPages, topReferrers, eventCounts] = await Promise.all([
       queryTimeSeries(db, data.projectId, range),
+      queryUniqueVisitors(db, data.projectId, range),
       queryTopPages(db, data.projectId, range),
       queryTopReferrers(db, data.projectId, range),
       queryEventCounts(db, data.projectId, range),
     ]);
 
-    return { timeSeries, topPages, topReferrers, eventCounts };
+    return { timeSeries, uniqueVisitors, topPages, topReferrers, eventCounts };
   });
 
 // ── Sessions list ─────────────────────────────────────────────────────────────

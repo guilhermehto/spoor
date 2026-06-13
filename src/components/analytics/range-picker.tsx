@@ -23,8 +23,7 @@ function toDateInput(iso: string): string {
   return iso.slice(0, 10);
 }
 
-export function buildRange(preset: Preset, customFrom?: string, customTo?: string): { from: string; to: string } {
-  const now = new Date();
+export function buildRange(preset: Preset, customFrom?: string, customTo?: string, now: Date = new Date()): { from: string; to: string } {
   if (preset === "today") {
     return {
       from: utcDayStart(now).toISOString(),
@@ -56,8 +55,7 @@ export function buildRange(preset: Preset, customFrom?: string, customTo?: strin
   };
 }
 
-function detectPreset(from: string, to: string): Preset {
-  const now = new Date();
+export function detectPreset(from: string, to: string, now: Date = new Date()): Preset {
   const todayStart = utcDayStart(now).toISOString();
   const todayEnd = utcDayEnd(now).toISOString();
 
