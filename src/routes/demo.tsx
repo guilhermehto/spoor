@@ -4,7 +4,7 @@
  * Embeds the live spoor.js snippet and provides buttons that exercise all
  * three event types so you can verify rows appear in analytics_events.
  */
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, notFound } from "@tanstack/react-router";
 
 declare global {
   interface Window {
@@ -13,6 +13,12 @@ declare global {
 }
 
 export const Route = createFileRoute("/demo")({
+  beforeLoad: () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (!(import.meta as any).env?.DEV) {
+      throw notFound();
+    }
+  },
   validateSearch: (search: Record<string, unknown>) => ({
     key: typeof search["key"] === "string" ? search["key"] : undefined,
   }),
