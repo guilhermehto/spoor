@@ -1,13 +1,16 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: spoor-dev-postgres
+    # No container_name / fixed host port on purpose: Compose isolates resources
+    # per project (the worktree dir name), and the host port is auto-assigned so
+    # many worktrees can run `pnpm dev` at once. scripts/dev.sh reads the port
+    # back and builds DATABASE_URL. See .env.example.
     environment:
       POSTGRES_USER: spoor
       POSTGRES_PASSWORD: spoor
       POSTGRES_DB: spoor
     ports:
-      - "5433:5432"
+      - "5432"
     volumes:
       - spoor-dev-data:/var/lib/postgresql/data
     healthcheck:
