@@ -21,6 +21,17 @@ pnpm dev          # boots Postgres on :5433, runs migrations, serves http://loca
 
 No `.env` is needed locally — dev uses fallbacks for all secrets and `DATABASE_URL` (matching the dev Postgres). To override, `cp .env.example .env` first.
 
+### Seeded dev account
+
+On `pnpm dev`, a ready-to-use admin account is seeded automatically (after migrations) and pre-filled on the login form — just press **Sign in**:
+
+| Field | Value |
+|---|---|
+| Email | `dev@spoor.local` |
+| Password | `spoordev123` |
+
+The seed (`pnpm db:seed`) is **development-only** — it refuses to run when `NODE_ENV=production` — and idempotent, so it's safe on every boot. Because Spoor allows a single admin, the seeded account claims that slot; to use your own credentials instead, reset the dev database (`docker compose -f docker-compose.dev.yml down -v`) and register at `/register` before the seed runs. The login form only pre-fills these values in dev (`import.meta.env.DEV`); production bundles never include them.
+
 ## Environment variables
 
 | Variable | Required | Description |
@@ -106,4 +117,5 @@ pnpm build       # production build → dist/
 pnpm test        # vitest unit tests
 pnpm db:generate # generate new Drizzle migration after schema changes
 pnpm db:migrate  # apply migrations
+pnpm db:seed     # seed the dev admin account (dev only; idempotent)
 ```

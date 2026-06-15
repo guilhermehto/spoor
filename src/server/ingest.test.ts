@@ -150,6 +150,42 @@ describe("parseAndValidate", () => {
     }
   });
 
+  it("accepts the error type with message and props", () => {
+    const body = JSON.stringify({
+      k: "x",
+      t: "error",
+      p: "/checkout",
+      h: "h.com",
+      n: "TypeError: undefined is not a function",
+      props: {
+        kind: "error",
+        source: "https://h.com/app.js",
+        line: 42,
+        col: 7,
+        stack: "TypeError: undefined is not a function\n    at f (app.js:42:7)",
+      },
+    });
+    const r = parseAndValidate(body, encode(body));
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.payload.t).toBe("error");
+      expect(r.payload.n).toBe("TypeError: undefined is not a function");
+      expect(r.payload.props).toMatchObject({ kind: "error", line: 42 });
+    }
+  });
+
+  it("accepts an error event without a name", () => {
+    const body = JSON.stringify({
+      k: "x",
+      t: "error",
+      p: "/",
+      h: "h.com",
+      props: { kind: "unhandledrejection" },
+    });
+    const r = parseAndValidate(body, encode(body));
+    expect(r.ok).toBe(true);
+  });
+
   it("rejects body exceeding 8 KB", () => {
     const big = "x".repeat(8193);
     const result = parseAndValidate(big, 8193);

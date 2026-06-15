@@ -51,6 +51,16 @@ function TypeIcon({ type }: { type: string }) {
       </span>
     );
   }
+  if (type === "error") {
+    return (
+      <span
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-700 text-xs font-bold"
+        title="Error"
+      >
+        !
+      </span>
+    );
+  }
   // custom
   return (
     <span
@@ -65,10 +75,20 @@ function TypeIcon({ type }: { type: string }) {
 // ── Event row ─────────────────────────────────────────────────────────────────
 
 function EventRow({ event }: { event: SessionEvent }) {
+  const isError = event.type === "error";
   const label =
     event.type === "pageview"
       ? event.path || "(unknown path)"
       : event.name || event.path || "(unnamed)";
+
+  const errorSource =
+    isError && event.props && typeof event.props["source"] === "string"
+      ? event.props["source"]
+      : null;
+  const errorLine =
+    isError && event.props && typeof event.props["line"] === "number"
+      ? event.props["line"]
+      : null;
 
   return (
     <li className="flex items-start gap-3 py-2">
@@ -80,7 +100,10 @@ function EventRow({ event }: { event: SessionEvent }) {
       {/* content */}
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-2">
-          <span className="truncate text-sm font-medium text-foreground" title={label}>
+          <span
+            className={`truncate text-sm font-medium ${isError ? "text-destructive" : "text-foreground"}`}
+            title={label}
+          >
             {label}
           </span>
           <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
@@ -95,6 +118,15 @@ function EventRow({ event }: { event: SessionEvent }) {
             {formatAbsoluteTime(new Date(event.createdAt))} UTC
           </span>
         </div>
+        {errorSource && (
+          <p
+            className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground"
+            title={errorSource}
+          >
+            {errorSource}
+            {errorLine !== null ? `:${errorLine}` : ""}
+          </p>
+        )}
       </div>
     </li>
   );

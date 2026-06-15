@@ -13,6 +13,7 @@ import {
   requireOwnedProject,
   queryTimeSeries,
   queryUniqueVisitors,
+  queryErrorCount,
   queryTopPages,
   queryTopReferrers,
   queryEventCounts,
@@ -69,6 +70,8 @@ export interface OverviewData {
   timeSeries: TimeSeriesBucket[];
   /** Range-wide distinct visitor count (headline card). */
   uniqueVisitors: number;
+  /** Range-wide error-event count (headline card). */
+  errorCount: number;
   topPages: RankedPage;
   topReferrers: RankedPage;
   eventCounts: RankedPage;
@@ -95,13 +98,15 @@ export const getOverviewFn = createServerFn({ method: "GET" })
 
     const fetchSize = RANKED_PAGE_SIZE + 1;
 
-    const [timeSeries, uniqueVisitors, rawPages, rawReferrers, rawEvents] = await Promise.all([
-      queryTimeSeries(db, data.projectId, range, filters),
-      queryUniqueVisitors(db, data.projectId, range, filters),
-      queryTopPages(db, data.projectId, range, { limit: fetchSize, filters }),
-      queryTopReferrers(db, data.projectId, range, { limit: fetchSize, filters }),
-      queryEventCounts(db, data.projectId, range, { limit: fetchSize, filters }),
-    ]);
+    const [timeSeries, uniqueVisitors, errorCount, rawPages, rawReferrers, rawEvents] =
+      await Promise.all([
+        queryTimeSeries(db, data.projectId, range, filters),
+        queryUniqueVisitors(db, data.projectId, range, filters),
+        queryErrorCount(db, data.projectId, range),
+        queryTopPages(db, data.projectId, range, { limit: fetchSize, filters }),
+        queryTopReferrers(db, data.projectId, range, { limit: fetchSize, filters }),
+        queryEventCounts(db, data.projectId, range, { limit: fetchSize, filters }),
+      ]);
 
     const topPages: RankedPage = {
       items: rawPages.slice(0, RANKED_PAGE_SIZE).map((p) => ({
@@ -131,7 +136,7 @@ export const getOverviewFn = createServerFn({ method: "GET" })
       hasMore: rawEvents.length > RANKED_PAGE_SIZE,
     };
 
-    return { timeSeries, uniqueVisitors, topPages, topReferrers, eventCounts };
+    return { timeSeries, uniqueVisitors, errorCount, topPages, topReferrers, eventCounts };
   });
 
 // ── Paginated ranked list ─────────────────────────────────────────────────────
