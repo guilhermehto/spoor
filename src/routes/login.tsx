@@ -1,7 +1,13 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { signIn } from "~/lib/auth-client";
+import { DEV_ACCOUNT } from "~/lib/dev-account";
 import { Button } from "~/components/ui/button";
+
+// Pre-fill the seeded dev account in development only. import.meta.env.DEV is a
+// build-time constant, so the credentials never ship in a production bundle.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const IS_DEV = Boolean((import.meta as any).env?.DEV);
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -9,8 +15,8 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState(IS_DEV ? DEV_ACCOUNT.email : "");
+  const [password, setPassword] = useState(IS_DEV ? DEV_ACCOUNT.password : "");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -39,6 +45,11 @@ function LoginPage() {
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
             Sign in to Spoor
           </h1>
+          {IS_DEV && (
+            <p className="mt-1 text-sm text-muted-foreground">
+              Dev account pre-filled — just press Sign in.
+            </p>
+          )}
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1">

@@ -51,7 +51,7 @@ function OverviewPage() {
   return (
     <div className="space-y-6">
       {/* Summary stats */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <Card>
           <CardHeader className="pb-1">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -73,6 +73,22 @@ function OverviewPage() {
           <CardContent>
             <p className="text-3xl font-bold tabular-nums text-foreground">
               {totalVisitors.toLocaleString()}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-1">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Errors
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p
+              className={`text-3xl font-bold tabular-nums ${
+                data.errorCount > 0 ? "text-destructive" : "text-foreground"
+              }`}
+            >
+              {data.errorCount.toLocaleString()}
             </p>
           </CardContent>
         </Card>

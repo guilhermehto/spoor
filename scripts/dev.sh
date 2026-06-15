@@ -39,4 +39,5 @@ printf '\n  \xe2\x96\xb8 %s\n    db    localhost:%s\n    app   http://localhost:
   "$project" "$db_port" "$app_port"
 
 pnpm db:migrate
+pnpm db:seed
 exec vite dev --port "$app_port" --strictPort

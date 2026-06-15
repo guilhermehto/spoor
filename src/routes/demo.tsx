@@ -309,6 +309,59 @@ function DemoPage() {
         <hr style={{ margin: "1.5rem 0" }} />
 
         <section>
+          <h2 style={{ fontSize: "1.1rem" }}>6. JavaScript errors (tracked)</h2>
+          <p style={{ color: "#555", fontSize: "0.9rem" }}>
+            Unlike section 5 (which exercises HTTP rejections), these trigger
+            real uncaught errors that the <code>spoor.js</code> snippet captures
+            and sends as <code>error</code> events. Afterwards, check the
+            project dashboard — the <strong>Errors</strong> card and the session
+            timeline will show them.
+          </p>
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+            <button
+              onClick={() => {
+                // setTimeout so the throw escapes React's event dispatch and
+                // reaches window's "error" handler as a genuine uncaught error.
+                setTimeout(() => {
+                  throw new Error("Demo: uncaught error from /demo");
+                }, 0);
+              }}
+              style={{
+                padding: "0.5rem 1.25rem",
+                background: "#dc2626",
+                color: "#fff",
+                border: "none",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontSize: "0.95rem",
+              }}
+            >
+              Throw uncaught error
+            </button>
+            <button
+              onClick={() => {
+                void Promise.reject(
+                  new Error("Demo: unhandled promise rejection from /demo"),
+                );
+              }}
+              style={{
+                padding: "0.5rem 1.25rem",
+                background: "#dc2626",
+                color: "#fff",
+                border: "none",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontSize: "0.95rem",
+              }}
+            >
+              Unhandled promise rejection
+            </button>
+          </div>
+        </section>
+
+        <hr style={{ margin: "1.5rem 0" }} />
+
+        <section>
           <h2 style={{ fontSize: "1.1rem" }}>Response log</h2>
           {log.length === 0 ? (
             <p style={{ color: "#888", fontSize: "0.9rem" }}>
