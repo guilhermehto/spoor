@@ -6,8 +6,7 @@
  */
 
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
-import { auth } from "~/lib/auth";
+import { requireSession } from "~/server/session";
 import { db } from "~/db/index";
 import {
   requireOwnedProject,
@@ -26,15 +25,6 @@ import {
   type JsonValue,
 } from "./analytics";
 import { type EventFilters } from "~/lib/event-filters";
-
-async function requireSession() {
-  const request = getRequest();
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    throw new Error("Unauthorized");
-  }
-  return session;
-}
 
 // ── Ranked list types ─────────────────────────────────────────────────────────
 

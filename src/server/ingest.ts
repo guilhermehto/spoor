@@ -31,7 +31,7 @@ import { computeVisitorHash, extractClientIp } from "./visitor";
 
 export const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
-const MAX_BODY_BYTES = 8 * 1024; // 8 KB
+export const MAX_BODY_BYTES = 8 * 1024; // 8 KB
 const MAX_PATH_LEN = 512;
 const MAX_NAME_LEN = 512;
 const MAX_PROPS_SERIALIZED = 2 * 1024; // 2 KB

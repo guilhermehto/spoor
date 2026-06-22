@@ -20,7 +20,6 @@ import {
   bucketGranularity,
   bucketKey,
   enumerateBuckets,
-  pgDateTruncUnit,
   type DateRange,
 } from "./analytics-buckets";
 import { resolveEventConstraints, type EventFilters } from "~/lib/event-filters";
@@ -141,9 +140,8 @@ export async function queryTimeSeries(
   filters: EventFilters = {},
 ): Promise<TimeSeriesBucket[]> {
   const granularity = bucketGranularity(range);
-  const truncUnit = pgDateTruncUnit(granularity);
   // date_trunc requires a literal string unit — use sql.raw to avoid parameterization.
-  const bucketExpr = sql<string>`date_trunc(${sql.raw(`'${truncUnit}'`)}, ${analyticsEvents.createdAt} AT TIME ZONE 'UTC')`;
+  const bucketExpr = sql<string>`date_trunc(${sql.raw(`'${granularity}'`)}, ${analyticsEvents.createdAt} AT TIME ZONE 'UTC')`;
 
   const constraints = resolveEventConstraints(filters);
 

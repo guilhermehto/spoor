@@ -12,10 +12,9 @@ import {
   findProjectByKey,
   persistEvent,
   isBot,
+  MAX_BODY_BYTES,
 } from "~/server/ingest";
 import { computeVisitorHash, extractClientIp } from "~/server/visitor";
-
-const MAX_BODY_BYTES = 8 * 1024; // 8 KB — must match ingest.ts inner guard
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
