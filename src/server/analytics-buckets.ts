@@ -93,13 +93,3 @@ export function snapToBucket(ts: Date, granularity: BucketGranularity): Date {
     Date.UTC(ts.getUTCFullYear(), ts.getUTCMonth(), ts.getUTCDate(), 0, 0, 0, 0),
   );
 }
-
-// ── Postgres date_trunc expression helper ─────────────────────────────────────
-
-/**
- * Returns the Postgres `date_trunc` unit string for a given granularity.
- * Used by analytics.ts to build the GROUP BY expression.
- */
-export function pgDateTruncUnit(granularity: BucketGranularity): "hour" | "day" {
-  return granularity;
-}

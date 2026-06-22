@@ -1,25 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
+import { randomBytes } from "node:crypto";
 import { eq, and } from "drizzle-orm";
 import { db } from "~/db/index";
 import { projects } from "~/db/schema";
-import { auth } from "~/lib/auth";
+import { requireSession } from "~/server/session";
 
 function generatePublicKey(): string {
-  const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-async function requireSession() {
-  const request = getRequest();
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
-    throw new Error("Unauthorized");
-  }
-  return session;
+  return randomBytes(16).toString("hex");
 }
 
 export const listProjectsFn = createServerFn({ method: "GET" }).handler(

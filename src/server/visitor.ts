@@ -12,8 +12,6 @@
 
 import { SPOOR_HASH_SECRET } from "./config";
 
-const HASH_SECRET = SPOOR_HASH_SECRET;
-
 /** Returns the UTC calendar date string "YYYY-MM-DD" for a given timestamp. */
 export function utcDateString(now: Date): string {
   return now.toISOString().slice(0, 10);
@@ -24,19 +22,12 @@ async function dailySalt(utcDate: string): Promise<ArrayBuffer> {
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey(
     "raw",
-    enc.encode(HASH_SECRET),
+    enc.encode(SPOOR_HASH_SECRET),
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"],
   );
   return crypto.subtle.sign("HMAC", key, enc.encode(utcDate));
-}
-
-/** Hex-encodes an ArrayBuffer. */
-function toHex(buf: ArrayBuffer): string {
-  return Array.from(new Uint8Array(buf))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
 }
 
 /**
@@ -62,7 +53,7 @@ export async function computeVisitorHash(
   combined.set(saltBytes, 0);
   combined.set(rest, saltBytes.byteLength);
   const digest = await crypto.subtle.digest("SHA-256", combined);
-  return toHex(digest);
+  return Buffer.from(digest).toString("hex");
 }
 
 /**
