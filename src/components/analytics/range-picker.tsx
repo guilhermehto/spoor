@@ -8,7 +8,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 
-type Preset = "today" | "7d" | "30d" | "custom";
+export type Preset = "today" | "24h" | "7d" | "30d" | "90d" | "custom";
 
 function utcDayStart(d: Date): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0));
@@ -16,6 +16,14 @@ function utcDayStart(d: Date): Date {
 
 function utcDayEnd(d: Date): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 23, 59, 59, 999));
+}
+
+function utcHourStart(d: Date): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), d.getUTCHours(), 0, 0, 0));
+}
+
+function utcHourEnd(d: Date): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), d.getUTCHours(), 59, 59, 999));
 }
 
 function toDateInput(iso: string): string {
@@ -30,6 +38,15 @@ export function buildRange(preset: Preset, customFrom?: string, customTo?: strin
       to: utcDayEnd(now).toISOString(),
     };
   }
+  if (preset === "24h") {
+    // ponytail: hour-snapped 24h window so it round-trips for the whole current hour.
+    const from = new Date(now);
+    from.setUTCHours(from.getUTCHours() - 23);
+    return {
+      from: utcHourStart(from).toISOString(),
+      to: utcHourEnd(now).toISOString(),
+    };
+  }
   if (preset === "7d") {
     const from = new Date(now);
     from.setUTCDate(from.getUTCDate() - 6);
@@ -41,6 +58,14 @@ export function buildRange(preset: Preset, customFrom?: string, customTo?: strin
   if (preset === "30d") {
     const from = new Date(now);
     from.setUTCDate(from.getUTCDate() - 29);
+    return {
+      from: utcDayStart(from).toISOString(),
+      to: utcDayEnd(now).toISOString(),
+    };
+  }
+  if (preset === "90d") {
+    const from = new Date(now);
+    from.setUTCDate(from.getUTCDate() - 89);
     return {
       from: utcDayStart(from).toISOString(),
       to: utcDayEnd(now).toISOString(),
@@ -61,6 +86,10 @@ export function detectPreset(from: string, to: string, now: Date = new Date()): 
 
   if (from === todayStart && to === todayEnd) return "today";
 
+  const dayAgoH = new Date(now);
+  dayAgoH.setUTCHours(dayAgoH.getUTCHours() - 23);
+  if (from === utcHourStart(dayAgoH).toISOString() && to === utcHourEnd(now).toISOString()) return "24h";
+
   const sevenFrom = new Date(now);
   sevenFrom.setUTCDate(sevenFrom.getUTCDate() - 6);
   if (from === utcDayStart(sevenFrom).toISOString() && to === todayEnd) return "7d";
@@ -68,6 +97,10 @@ export function detectPreset(from: string, to: string, now: Date = new Date()): 
   const thirtyFrom = new Date(now);
   thirtyFrom.setUTCDate(thirtyFrom.getUTCDate() - 29);
   if (from === utcDayStart(thirtyFrom).toISOString() && to === todayEnd) return "30d";
+
+  const ninetyFrom = new Date(now);
+  ninetyFrom.setUTCDate(ninetyFrom.getUTCDate() - 89);
+  if (from === utcDayStart(ninetyFrom).toISOString() && to === todayEnd) return "90d";
 
   return "custom";
 }
