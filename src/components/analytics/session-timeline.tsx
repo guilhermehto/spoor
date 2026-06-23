@@ -1,8 +1,10 @@
 /**
- * SessionTimeline — ordered event list for a single session.
+ * SessionTimeline — editorial journey timeline for a single session.
  *
- * Each event shows a type icon, name/path, and relative timestamp offset from
- * session start.  Works for sessions with a single pageview.
+ * A vertical list with a left rail.  Each step shows its absolute time (+offset
+ * from session start), a kind-colored dot on the rail, a kind badge + label,
+ * and (custom events only) a props meta chip.  Works for single-pageview
+ * sessions.
  */
 
 import type { SessionEvent } from "~/server/analytics-fns";
@@ -28,103 +30,74 @@ function formatAbsoluteTime(date: Date): string {
   });
 }
 
-// ── Type icon ─────────────────────────────────────────────────────────────────
-
-function TypeIcon({ type }: { type: string }) {
-  if (type === "pageview") {
-    return (
-      <span
-        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700 text-xs font-bold"
-        title="Pageview"
-      >
-        P
-      </span>
-    );
-  }
-  if (type === "click") {
-    return (
-      <span
-        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 text-xs font-bold"
-        title="Click"
-      >
-        C
-      </span>
-    );
-  }
-  if (type === "error") {
-    return (
-      <span
-        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-700 text-xs font-bold"
-        title="Error"
-      >
-        !
-      </span>
-    );
-  }
-  // custom
-  return (
-    <span
-      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-purple-100 text-purple-700 text-xs font-bold"
-      title="Custom event"
-    >
-      E
-    </span>
-  );
+// Kind → editorial colors. Unknown kinds (e.g. error) fall to the negative token.
+function dotBgClass(type: string): string {
+  if (type === "pageview") return "bg-muted-foreground";
+  if (type === "click") return "bg-primary";
+  if (type === "custom") return "bg-secondary";
+  return "bg-[var(--color-negative)]";
 }
 
-// ── Event row ─────────────────────────────────────────────────────────────────
+function textColorClass(type: string): string {
+  if (type === "pageview") return "text-muted-foreground";
+  if (type === "click") return "text-primary";
+  if (type === "custom") return "text-secondary";
+  return "text-[var(--color-negative)]";
+}
 
-function EventRow({ event }: { event: SessionEvent }) {
-  const isError = event.type === "error";
+// ── Timeline step ─────────────────────────────────────────────────────────────
+
+function TimelineStep({ event, isLast }: { event: SessionEvent; isLast: boolean }) {
   const label =
     event.type === "pageview"
       ? event.path || "(unknown path)"
       : event.name || event.path || "(unnamed)";
 
-  const errorSource =
-    isError && event.props && typeof event.props["source"] === "string"
-      ? event.props["source"]
-      : null;
-  const errorLine =
-    isError && event.props && typeof event.props["line"] === "number"
-      ? event.props["line"]
-      : null;
+  // Meta chip only for custom events (clicks capture no selector — DEFERRED).
+  const meta =
+    event.type === "custom" && event.props ? JSON.stringify(event.props) : null;
 
   return (
-    <li className="flex items-start gap-3 py-2">
-      {/* connector line + icon */}
-      <div className="flex flex-col items-center">
-        <TypeIcon type={event.type} />
+    <li className="grid grid-cols-[auto_16px_minmax(0,1fr)] gap-x-3">
+      {/* time column */}
+      <div className="pt-0.5 text-right">
+        <div className="font-mono text-[11px] tabular-nums text-muted-foreground">
+          {formatAbsoluteTime(new Date(event.createdAt))}
+        </div>
+        <div className="font-mono text-[10px] tabular-nums text-muted-foreground/70">
+          +{formatOffset(event.offsetMs)}
+        </div>
       </div>
 
-      {/* content */}
-      <div className="min-w-0 flex-1">
-        <div className="flex items-baseline justify-between gap-2">
+      {/* rail + dot — connector runs from this dot down to the next */}
+      <div className="relative flex justify-center">
+        {!isLast && (
+          <span aria-hidden className="absolute bottom-0 top-[14px] w-[2px] bg-border" />
+        )}
+        <span
+          aria-hidden
+          className={`relative mt-1 h-[9px] w-[9px] rounded-full ring-2 ring-[var(--color-card)] ${dotBgClass(event.type)}`}
+        />
+      </div>
+
+      {/* label column */}
+      <div className="min-w-0 pb-5">
+        <div className="flex min-w-0 items-center gap-2">
           <span
-            className={`truncate text-sm font-medium ${isError ? "text-destructive" : "text-foreground"}`}
-            title={label}
+            className={`shrink-0 border-2 border-border bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${textColorClass(event.type)}`}
           >
-            {label}
-          </span>
-          <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-            +{formatOffset(event.offsetMs)}
-          </span>
-        </div>
-        <div className="flex items-center gap-2 mt-0.5">
-          <span className="rounded bg-muted px-1 py-0.5 font-mono text-[10px] text-muted-foreground">
             {event.type}
           </span>
-          <span className="text-xs text-muted-foreground tabular-nums">
-            {formatAbsoluteTime(new Date(event.createdAt))} UTC
+          <span className="truncate text-sm font-medium text-foreground" title={label}>
+            {label}
           </span>
         </div>
-        {errorSource && (
+        {meta && (
           <p
-            className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground"
-            title={errorSource}
+            className="mt-1 truncate border-2 border-border bg-muted px-2 py-1 font-mono text-[11px] text-muted-foreground"
+            title={meta}
           >
-            {errorSource}
-            {errorLine !== null ? `:${errorLine}` : ""}
+            {meta}
           </p>
         )}
       </div>
@@ -141,17 +114,17 @@ interface SessionTimelineProps {
 export function SessionTimeline({ events }: SessionTimelineProps) {
   if (events.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground py-4">
+      <p className="py-2 text-sm text-muted-foreground">
         No events recorded for this session.
       </p>
     );
   }
 
   return (
-    <ul className="divide-y divide-border">
-      {events.map((event) => (
-        <EventRow key={event.id} event={event} />
+    <ol className="flex flex-col">
+      {events.map((event, i) => (
+        <TimelineStep key={event.id} event={event} isLast={i === events.length - 1} />
       ))}
-    </ul>
+    </ol>
   );
 }
