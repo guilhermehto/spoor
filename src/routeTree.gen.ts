@@ -21,6 +21,7 @@ import { Route as DashboardProjectIdRouteRouteImport } from './routes/dashboard/
 import { Route as DashboardProjectIdIndexRouteImport } from './routes/dashboard/$projectId/index'
 import { Route as DashboardProjectIdSetupRouteImport } from './routes/dashboard/$projectId/setup'
 import { Route as DashboardProjectIdSessionsRouteImport } from './routes/dashboard/$projectId/sessions'
+import { Route as DashboardProjectIdEventsRouteImport } from './routes/dashboard/$projectId/events'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
 const RegisterRoute = RegisterRouteImport.update({
@@ -84,6 +85,12 @@ const DashboardProjectIdSessionsRoute =
     path: '/sessions',
     getParentRoute: () => DashboardProjectIdRouteRoute,
   } as any)
+const DashboardProjectIdEventsRoute =
+  DashboardProjectIdEventsRouteImport.update({
+    id: '/events',
+    path: '/events',
+    getParentRoute: () => DashboardProjectIdRouteRoute,
+  } as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -101,6 +108,7 @@ export interface FileRoutesByFullPath {
   '/api/ingest': typeof ApiIngestRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/dashboard/$projectId/events': typeof DashboardProjectIdEventsRoute
   '/dashboard/$projectId/sessions': typeof DashboardProjectIdSessionsRoute
   '/dashboard/$projectId/setup': typeof DashboardProjectIdSetupRoute
   '/dashboard/$projectId/': typeof DashboardProjectIdIndexRoute
@@ -114,6 +122,7 @@ export interface FileRoutesByTo {
   '/api/ingest': typeof ApiIngestRoute
   '/dashboard': typeof DashboardIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/dashboard/$projectId/events': typeof DashboardProjectIdEventsRoute
   '/dashboard/$projectId/sessions': typeof DashboardProjectIdSessionsRoute
   '/dashboard/$projectId/setup': typeof DashboardProjectIdSetupRoute
   '/dashboard/$projectId': typeof DashboardProjectIdIndexRoute
@@ -130,6 +139,7 @@ export interface FileRoutesById {
   '/api/ingest': typeof ApiIngestRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/dashboard/$projectId/events': typeof DashboardProjectIdEventsRoute
   '/dashboard/$projectId/sessions': typeof DashboardProjectIdSessionsRoute
   '/dashboard/$projectId/setup': typeof DashboardProjectIdSetupRoute
   '/dashboard/$projectId/': typeof DashboardProjectIdIndexRoute
@@ -147,6 +157,7 @@ export interface FileRouteTypes {
     | '/api/ingest'
     | '/dashboard/'
     | '/api/auth/$'
+    | '/dashboard/$projectId/events'
     | '/dashboard/$projectId/sessions'
     | '/dashboard/$projectId/setup'
     | '/dashboard/$projectId/'
@@ -160,6 +171,7 @@ export interface FileRouteTypes {
     | '/api/ingest'
     | '/dashboard'
     | '/api/auth/$'
+    | '/dashboard/$projectId/events'
     | '/dashboard/$projectId/sessions'
     | '/dashboard/$projectId/setup'
     | '/dashboard/$projectId'
@@ -175,6 +187,7 @@ export interface FileRouteTypes {
     | '/api/ingest'
     | '/dashboard/'
     | '/api/auth/$'
+    | '/dashboard/$projectId/events'
     | '/dashboard/$projectId/sessions'
     | '/dashboard/$projectId/setup'
     | '/dashboard/$projectId/'
@@ -277,6 +290,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardProjectIdSessionsRouteImport
       parentRoute: typeof DashboardProjectIdRouteRoute
     }
+    '/dashboard/$projectId/events': {
+      id: '/dashboard/$projectId/events'
+      path: '/events'
+      fullPath: '/dashboard/$projectId/events'
+      preLoaderRoute: typeof DashboardProjectIdEventsRouteImport
+      parentRoute: typeof DashboardProjectIdRouteRoute
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -288,6 +308,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface DashboardProjectIdRouteRouteChildren {
+  DashboardProjectIdEventsRoute: typeof DashboardProjectIdEventsRoute
   DashboardProjectIdSessionsRoute: typeof DashboardProjectIdSessionsRoute
   DashboardProjectIdSetupRoute: typeof DashboardProjectIdSetupRoute
   DashboardProjectIdIndexRoute: typeof DashboardProjectIdIndexRoute
@@ -295,6 +316,7 @@ interface DashboardProjectIdRouteRouteChildren {
 
 const DashboardProjectIdRouteRouteChildren: DashboardProjectIdRouteRouteChildren =
   {
+    DashboardProjectIdEventsRoute: DashboardProjectIdEventsRoute,
     DashboardProjectIdSessionsRoute: DashboardProjectIdSessionsRoute,
     DashboardProjectIdSetupRoute: DashboardProjectIdSetupRoute,
     DashboardProjectIdIndexRoute: DashboardProjectIdIndexRoute,
