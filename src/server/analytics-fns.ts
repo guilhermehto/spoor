@@ -18,6 +18,10 @@ import {
   queryEventCounts,
   querySessions,
   querySessionTimeline,
+  queryPageviewTotal,
+  querySessionCount,
+  queryAvgSessionDuration,
+  queryEventPropBreakdown,
   type DateRange,
   type TimeSeriesBucket,
   type SessionSummary,
@@ -65,6 +69,18 @@ export interface OverviewData {
   topPages: RankedPage;
   topReferrers: RankedPage;
   eventCounts: RankedPage;
+  metrics: {
+    pageViews: number;
+    uniqueVisitors: number;
+    sessions: number;
+    avgSessionSeconds: number;
+    deltas: {
+      pageViews: number;
+      uniqueVisitors: number;
+      sessions: number;
+      avgSessionSeconds: number;
+    };
+  };
 }
 
 export const getOverviewFn = createServerFn({ method: "GET" })
@@ -88,15 +104,42 @@ export const getOverviewFn = createServerFn({ method: "GET" })
 
     const fetchSize = RANKED_PAGE_SIZE + 1;
 
-    const [timeSeries, uniqueVisitors, errorCount, rawPages, rawReferrers, rawEvents] =
-      await Promise.all([
-        queryTimeSeries(db, data.projectId, range, filters),
-        queryUniqueVisitors(db, data.projectId, range, filters),
-        queryErrorCount(db, data.projectId, range),
-        queryTopPages(db, data.projectId, range, { limit: fetchSize, filters }),
-        queryTopReferrers(db, data.projectId, range, { limit: fetchSize, filters }),
-        queryEventCounts(db, data.projectId, range, { limit: fetchSize, filters }),
-      ]);
+    // Immediately-preceding equal-length window for deltas: prev = [from−span, from].
+    const span = range.to.getTime() - range.from.getTime();
+    const prevRange: DateRange = {
+      from: new Date(range.from.getTime() - span),
+      to: range.from,
+    };
+
+    const [
+      timeSeries,
+      uniqueVisitors,
+      errorCount,
+      rawPages,
+      rawReferrers,
+      rawEvents,
+      pageViews,
+      sessions,
+      avgSessionSeconds,
+      prevPageViews,
+      prevVisitors,
+      prevSessions,
+      prevAvg,
+    ] = await Promise.all([
+      queryTimeSeries(db, data.projectId, range, filters),
+      queryUniqueVisitors(db, data.projectId, range, filters),
+      queryErrorCount(db, data.projectId, range),
+      queryTopPages(db, data.projectId, range, { limit: fetchSize, filters }),
+      queryTopReferrers(db, data.projectId, range, { limit: fetchSize, filters }),
+      queryEventCounts(db, data.projectId, range, { limit: fetchSize, filters }),
+      queryPageviewTotal(db, data.projectId, range, filters),
+      querySessionCount(db, data.projectId, range),
+      queryAvgSessionDuration(db, data.projectId, range),
+      queryPageviewTotal(db, data.projectId, prevRange, filters),
+      queryUniqueVisitors(db, data.projectId, prevRange, filters),
+      querySessionCount(db, data.projectId, prevRange),
+      queryAvgSessionDuration(db, data.projectId, prevRange),
+    ]);
 
     const topPages: RankedPage = {
       items: rawPages.slice(0, RANKED_PAGE_SIZE).map((p) => ({
@@ -126,7 +169,31 @@ export const getOverviewFn = createServerFn({ method: "GET" })
       hasMore: rawEvents.length > RANKED_PAGE_SIZE,
     };
 
-    return { timeSeries, uniqueVisitors, errorCount, topPages, topReferrers, eventCounts };
+    const deltaPct = (cur: number, prev: number): number =>
+      prev > 0 ? Math.round(((cur - prev) / prev) * 100) : 0;
+
+    const metrics: OverviewData["metrics"] = {
+      pageViews,
+      uniqueVisitors,
+      sessions,
+      avgSessionSeconds,
+      deltas: {
+        pageViews: deltaPct(pageViews, prevPageViews),
+        uniqueVisitors: deltaPct(uniqueVisitors, prevVisitors),
+        sessions: deltaPct(sessions, prevSessions),
+        avgSessionSeconds: deltaPct(avgSessionSeconds, prevAvg),
+      },
+    };
+
+    return {
+      timeSeries,
+      uniqueVisitors,
+      errorCount,
+      topPages,
+      topReferrers,
+      eventCounts,
+      metrics,
+    };
   });
 
 // ── Paginated ranked list ─────────────────────────────────────────────────────
@@ -264,4 +331,80 @@ export const getSessionTimelineFn = createServerFn({ method: "GET" })
     const session = await requireSession();
     await requireOwnedProject(db, data.projectId, session.user.id);
     return querySessionTimeline(db, data.projectId, data.sessionId);
+  });
+
+// ── Events list ───────────────────────────────────────────────────────────────
+
+export interface EventsRow {
+  name: string;
+  type: string;
+  count: number;
+  sharePct: number;
+  /** How the event fires: `spoor("name", …)` for custom, null for click. */
+  trigger: string | null;
+}
+
+export interface EventsData {
+  summary: { fired: number; clicks: number; custom: number; types: number };
+  /** All click/custom event rows in range, ranked desc by count (cap 100). */
+  rows: EventsRow[];
+}
+
+interface EventsInput {
+  projectId: string;
+  from: string;
+  to: string;
+}
+
+export const getEventsFn = createServerFn({ method: "GET" })
+  .validator((data: EventsInput) => data)
+  .handler(async ({ data }): Promise<EventsData> => {
+    const session = await requireSession();
+    await requireOwnedProject(db, data.projectId, session.user.id);
+
+    const range: DateRange = { from: new Date(data.from), to: new Date(data.to) };
+
+    const rows = await queryEventCounts(db, data.projectId, range, { limit: 100 });
+
+    const fired = rows.reduce((sum, r) => sum + r.count, 0);
+    const clicks = rows
+      .filter((r) => r.type === "click")
+      .reduce((sum, r) => sum + r.count, 0);
+    const custom = rows
+      .filter((r) => r.type === "custom")
+      .reduce((sum, r) => sum + r.count, 0);
+
+    return {
+      summary: { fired, clicks, custom, types: rows.length },
+      rows: rows.map((r) => ({
+        name: r.name,
+        type: r.type,
+        count: r.count,
+        sharePct: fired > 0 ? Math.round((r.count / fired) * 100) : 0,
+        trigger: r.type === "custom" ? `spoor("${r.name}", …)` : null,
+      })),
+    };
+  });
+
+// ── Event property breakdown ──────────────────────────────────────────────────
+
+export interface EventBreakdown {
+  prop: string;
+  dist: Array<{ value: string; pct: number }>;
+}
+
+interface EventBreakdownInput {
+  projectId: string;
+  from: string;
+  to: string;
+  name: string;
+}
+
+export const getEventBreakdownFn = createServerFn({ method: "GET" })
+  .validator((data: EventBreakdownInput) => data)
+  .handler(async ({ data }): Promise<EventBreakdown | null> => {
+    const session = await requireSession();
+    await requireOwnedProject(db, data.projectId, session.user.id);
+    const range: DateRange = { from: new Date(data.from), to: new Date(data.to) };
+    return queryEventPropBreakdown(db, data.projectId, range, data.name);
   });
