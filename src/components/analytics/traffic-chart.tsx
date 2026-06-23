@@ -1,26 +1,25 @@
 /**
- * TrafficChart — recharts area chart of page views (or events) and unique visitors over time.
+ * TrafficChart — editorial two-line chart of page views & unique visitors over time.
  *
- * When `eventMode` is true the primary series is labelled "Events" and the
- * empty-state copy reflects that; the default ("Views") is unchanged.
+ * Page views = primary (orange) line, width 3, with a filled end-dot.
+ * Visitors   = secondary (ink) line, width ~1.5, no dots.
+ * No filled areas; minimal horizontal gridlines; muted axis ticks.
  */
 
 import {
-  AreaChart,
-  Area,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
+  ReferenceDot,
 } from "recharts";
 import type { TimeSeriesBucket } from "~/server/analytics";
 
 interface TrafficChartProps {
   data: TimeSeriesBucket[];
-  /** When true, relabels the primary series as "Events" (event-filter active). */
-  eventMode?: boolean;
 }
 
 function formatBucketLabel(bucket: string): string {
@@ -42,48 +41,41 @@ function formatBucketLabel(bucket: string): string {
   return d.toLocaleString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 }
 
-export function TrafficChart({ data, eventMode = false }: TrafficChartProps) {
+export function TrafficChart({ data }: TrafficChartProps) {
   const isEmpty = data.every((b) => b.views === 0 && b.visitors === 0);
 
   if (isEmpty) {
     return (
       <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
-        {eventMode ? "No events in this period." : "No page views in this period."}
+        No page views in this period.
       </div>
     );
   }
 
-  const primaryKey = eventMode ? "Events" : "Views";
-
   const chartData = data.map((b) => ({
     label: formatBucketLabel(b.bucket),
-    [primaryKey]: b.views,
+    "Page views": b.views,
     Visitors: b.visitors,
   }));
+  const last = chartData[chartData.length - 1]!;
 
   return (
     <ResponsiveContainer width="100%" height={240}>
-      <AreaChart data={chartData} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
-        <defs>
-          <linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="hsl(240 5.9% 10%)" stopOpacity={0.15} />
-            <stop offset="95%" stopColor="hsl(240 5.9% 10%)" stopOpacity={0} />
-          </linearGradient>
-          <linearGradient id="colorVisitors" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="hsl(240 3.8% 46.1%)" stopOpacity={0.15} />
-            <stop offset="95%" stopColor="hsl(240 3.8% 46.1%)" stopOpacity={0} />
-          </linearGradient>
-        </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="hsl(240 5.9% 90%)" />
+      <LineChart data={chartData} margin={{ top: 6, right: 8, left: -16, bottom: 0 }}>
+        <CartesianGrid
+          vertical={false}
+          stroke="var(--color-border)"
+          strokeOpacity={0.15}
+        />
         <XAxis
           dataKey="label"
-          tick={{ fontSize: 11, fill: "hsl(240 3.8% 46.1%)" }}
+          tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
           tickLine={false}
           axisLine={false}
           interval="preserveStartEnd"
         />
         <YAxis
-          tick={{ fontSize: 11, fill: "hsl(240 3.8% 46.1%)" }}
+          tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
           tickLine={false}
           axisLine={false}
           allowDecimals={false}
@@ -91,29 +83,39 @@ export function TrafficChart({ data, eventMode = false }: TrafficChartProps) {
         <Tooltip
           contentStyle={{
             fontSize: 12,
-            borderRadius: 6,
-            border: "1px solid hsl(240 5.9% 90%)",
-            background: "hsl(0 0% 100%)",
+            borderRadius: 0,
+            border: "2px solid var(--color-border)",
+            background: "var(--color-card)",
+            color: "var(--color-foreground)",
           }}
+          cursor={{ stroke: "var(--color-border)", strokeOpacity: 0.3 }}
         />
-        <Legend wrapperStyle={{ fontSize: 12 }} />
-        <Area
+        <Line
           type="monotone"
-          dataKey={primaryKey}
-          stroke="hsl(240 5.9% 10%)"
-          strokeWidth={2}
-          fill="url(#colorViews)"
+          dataKey="Page views"
+          stroke="var(--color-primary)"
+          strokeWidth={3}
           dot={false}
+          activeDot={{ r: 4, fill: "var(--color-primary)", stroke: "var(--color-card)", strokeWidth: 2 }}
+          isAnimationActive={false}
         />
-        <Area
+        <Line
           type="monotone"
           dataKey="Visitors"
-          stroke="hsl(240 3.8% 46.1%)"
-          strokeWidth={2}
-          fill="url(#colorVisitors)"
+          stroke="var(--color-secondary)"
+          strokeWidth={1.5}
           dot={false}
+          isAnimationActive={false}
         />
-      </AreaChart>
+        <ReferenceDot
+          x={last.label}
+          y={last["Page views"]}
+          r={3.2}
+          fill="var(--color-primary)"
+          stroke="var(--color-card)"
+          strokeWidth={2}
+        />
+      </LineChart>
     </ResponsiveContainer>
   );
 }
