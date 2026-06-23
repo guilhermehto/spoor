@@ -1,34 +1,69 @@
+@import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
-@theme {
-  --color-background: hsl(0 0% 100%);
-  --color-foreground: hsl(240 10% 3.9%);
-  --color-card: hsl(0 0% 100%);
-  --color-card-foreground: hsl(240 10% 3.9%);
-  --color-popover: hsl(0 0% 100%);
-  --color-popover-foreground: hsl(240 10% 3.9%);
-  --color-primary: hsl(240 5.9% 10%);
-  --color-primary-foreground: hsl(0 0% 98%);
-  --color-secondary: hsl(240 4.8% 95.9%);
-  --color-secondary-foreground: hsl(240 5.9% 10%);
-  --color-muted: hsl(240 4.8% 95.9%);
-  --color-muted-foreground: hsl(240 3.8% 46.1%);
-  --color-accent: hsl(240 4.8% 95.9%);
-  --color-accent-foreground: hsl(240 5.9% 10%);
-  --color-destructive: hsl(0 84.2% 60.2%);
-  --color-destructive-foreground: hsl(0 0% 98%);
-  --color-border: hsl(240 5.9% 90%);
-  --color-input: hsl(240 5.9% 90%);
-  --color-ring: hsl(240 5.9% 10%);
-  --radius: 0.5rem;
+:root {
+  --background: #f3f0e8;
+  --card: #fffefb;
+  --muted: #ece7da;
+  --foreground: #161310;
+  --muted-foreground: #56514a;
+  --border: #161310; /* editorial borders are INK (near-black), strong */
+  --primary: #ec3a14; /* accent — orange-red */
+  --primary-foreground: #fffefb;
+  --secondary: #161310; /* accent2 — ink (visitors line, referrer bars) */
+  --negative: #161310; /* negative delta color (ink in editorial) */
+  --radius: 0px;
+}
+
+.dark {
+  --background: #13110c;
+  --card: #1b1812;
+  --muted: #231e16;
+  --foreground: #f5f0e6;
+  --muted-foreground: #9b9180;
+  --border: #f5f0e6;
+  --primary: #ff6a3d;
+  --primary-foreground: #13110c;
+  --secondary: #f5f0e6;
+  --negative: #ff6a3d;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-card: var(--card);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-foreground: var(--foreground);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-negative: var(--negative);
+
+  /* compat tokens: kept so existing primitives/routes still resolve. */
+  --color-destructive: var(--primary);
+  --color-destructive-foreground: var(--primary-foreground);
+  --color-secondary-foreground: var(--primary-foreground);
+  --color-ring: var(--primary);
+  --color-input: var(--border);
+
+  --radius: var(--radius);
+  --font-sans: 'Hanken Grotesk', ui-sans-serif, system-ui, sans-serif;
 }
 
 @layer base {
-  * {
-    border-color: var(--color-border);
-  }
   body {
-    background-color: var(--color-background);
-    color: var(--color-foreground);
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+  }
+}
+
+@layer components {
+  .eyebrow {
+    @apply text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground;
+  }
+  .metric {
+    @apply font-bold tabular-nums tracking-[-0.015em] leading-none text-[48px];
   }
 }
