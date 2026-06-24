@@ -1,10 +1,11 @@
-import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { listProjectsFn, createProjectFn, deleteProjectFn } from "~/server/projects";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { signOut, useSession } from "~/lib/auth-client";
 
 export const Route = createFileRoute("/dashboard/")({
   loader: () => listProjectsFn(),
@@ -17,6 +18,13 @@ function DashboardIndex() {
   const [name, setName] = useState("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const { data: session } = useSession();
+
+  async function handleSignOut() {
+    await signOut();
+    await navigate({ to: "/login" });
+  }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -44,7 +52,24 @@ function DashboardIndex() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="min-h-screen bg-background">
+      <header className="border-b border-border">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+          <span className="text-lg font-semibold text-foreground">Spoor</span>
+          <div className="flex items-center gap-4">
+            {session?.user?.email && (
+              <span className="text-sm text-muted-foreground">
+                {session.user.email}
+              </span>
+            )}
+            <Button variant="outline" size="sm" onClick={handleSignOut}>
+              Sign out
+            </Button>
+          </div>
+        </div>
+      </header>
+      <main className="mx-auto max-w-7xl px-6 py-8">
+        <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Projects</h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -127,6 +152,8 @@ function DashboardIndex() {
           ))}
         </div>
       )}
+        </div>
+      </main>
     </div>
   );
 }

@@ -117,6 +117,89 @@ export async function queryErrorCount(
   return Number(row?.total ?? 0);
 }
 
+// ── Range-wide pageview total ─────────────────────────────────────────────────
+
+/**
+ * Returns the total number of pageview events across the [from, to] range for a
+ * project.  Respects EventFilters via the same pageview-default resolution as the
+ * other event queries (no filters → counts type='pageview').
+ */
+export async function queryPageviewTotal(
+  db: DB,
+  projectId: string,
+  range: DateRange,
+  filters: EventFilters = {},
+): Promise<number> {
+  const constraints = resolveEventConstraints(filters);
+  const [row] = await db
+    .select({ total: count(analyticsEvents.id).as("total") })
+    .from(analyticsEvents)
+    .where(
+      and(
+        eq(analyticsEvents.projectId, projectId),
+        gte(analyticsEvents.createdAt, range.from),
+        lte(analyticsEvents.createdAt, range.to),
+        constraints.type !== undefined ? eq(analyticsEvents.type, constraints.type) : undefined,
+        constraints.path !== undefined ? eq(analyticsEvents.path, constraints.path) : undefined,
+        constraints.name !== undefined ? eq(analyticsEvents.name, constraints.name) : undefined,
+      ),
+    );
+  return Number(row?.total ?? 0);
+}
+
+// ── Range-wide session count ──────────────────────────────────────────────────
+
+/**
+ * Returns the number of sessions whose `startedAt` falls within [from, to].
+ */
+export async function querySessionCount(
+  db: DB,
+  projectId: string,
+  range: DateRange,
+): Promise<number> {
+  const [row] = await db
+    .select({ total: count(analyticsSessions.id).as("total") })
+    .from(analyticsSessions)
+    .where(
+      and(
+        eq(analyticsSessions.projectId, projectId),
+        gte(analyticsSessions.startedAt, range.from),
+        lte(analyticsSessions.startedAt, range.to),
+      ),
+    );
+  return Number(row?.total ?? 0);
+}
+
+// ── Average session duration ──────────────────────────────────────────────────
+
+/**
+ * Returns the average session duration in **seconds** (lastSeenAt − startedAt)
+ * over sessions whose `startedAt` falls within [from, to].  Returns 0 when the
+ * range contains no sessions.
+ */
+export async function queryAvgSessionDuration(
+  db: DB,
+  projectId: string,
+  range: DateRange,
+): Promise<number> {
+  const [row] = await db
+    .select({
+      avgSeconds:
+        sql<number | null>`avg(extract(epoch from (${analyticsSessions.lastSeenAt} - ${analyticsSessions.startedAt})))`.as(
+          "avg_seconds",
+        ),
+    })
+    .from(analyticsSessions)
+    .where(
+      and(
+        eq(analyticsSessions.projectId, projectId),
+        gte(analyticsSessions.startedAt, range.from),
+        lte(analyticsSessions.startedAt, range.to),
+      ),
+    );
+  return Math.round(Number(row?.avgSeconds ?? 0));
+}
+
 // ── Time-series: pageviews + unique visitors per bucket ───────────────────────
 
 export interface TimeSeriesBucket {
@@ -346,6 +429,84 @@ export async function queryEventCounts(
   }));
 }
 
+// ── Event property breakdown ──────────────────────────────────────────────────
+
+/**
+ * For a single event `name` within [from, to], samples up to 2000 props-bearing
+ * events, picks the most frequently-present top-level prop key whose values are
+ * scalar (string/number/boolean), and returns its top 6 values as
+ * `{ value, pct }` (pct of sampled events that carry the key), sorted desc.
+ * Returns `null` when no events carry a scalar prop key.
+ *
+ * // ponytail: 2000-row JS sample; move to SQL jsonb aggregation if event volume grows.
+ */
+export async function queryEventPropBreakdown(
+  db: DB,
+  projectId: string,
+  range: DateRange,
+  name: string,
+): Promise<{ prop: string; dist: Array<{ value: string; pct: number }> } | null> {
+  const rows = await db
+    .select({ props: analyticsEvents.props })
+    .from(analyticsEvents)
+    .where(
+      and(
+        eq(analyticsEvents.projectId, projectId),
+        eq(analyticsEvents.name, name),
+        gte(analyticsEvents.createdAt, range.from),
+        lte(analyticsEvents.createdAt, range.to),
+        sql`${analyticsEvents.props} is not null`,
+      ),
+    )
+    .limit(2000);
+
+  // Collect well-formed prop objects and count how often each scalar key appears.
+  const objects: Array<{ [key: string]: JsonValue }> = [];
+  const keyFreq = new Map<string, number>();
+  for (const r of rows) {
+    const props = r.props as { [key: string]: JsonValue } | null;
+    if (!props || typeof props !== "object" || Array.isArray(props)) continue;
+    objects.push(props);
+    for (const [k, v] of Object.entries(props)) {
+      const t = typeof v;
+      if (t === "string" || t === "number" || t === "boolean") {
+        keyFreq.set(k, (keyFreq.get(k) ?? 0) + 1);
+      }
+    }
+  }
+  if (keyFreq.size === 0) return null;
+
+  // Most frequent scalar key (Map preserves insertion order, so ties keep first-seen).
+  let prop = "";
+  let best = -1;
+  for (const [k, c] of keyFreq) {
+    if (c > best) {
+      prop = k;
+      best = c;
+    }
+  }
+
+  // Tally that key's scalar values over the events that carry it.
+  const valueFreq = new Map<string, number>();
+  let sampled = 0;
+  for (const props of objects) {
+    const v = props[prop];
+    const t = typeof v;
+    if (t !== "string" && t !== "number" && t !== "boolean") continue;
+    sampled++;
+    const key = String(v);
+    valueFreq.set(key, (valueFreq.get(key) ?? 0) + 1);
+  }
+  if (sampled === 0) return null;
+
+  const dist = [...valueFreq.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([value, c]) => ({ value, pct: Math.round((c / sampled) * 100) }));
+
+  return { prop, dist };
+}
+
 // ── Session list ──────────────────────────────────────────────────────────────
 
 export interface SessionSummary {
@@ -357,6 +518,10 @@ export interface SessionSummary {
   /** Duration in seconds (lastSeenAt - startedAt). */
   durationSeconds: number;
   eventCount: number;
+  /** Pageview events (type='pageview') in the session. */
+  pageviewCount: number;
+  /** Interaction events (type in 'click'/'custom') in the session. */
+  interactionCount: number;
 }
 
 /**
@@ -380,6 +545,14 @@ export async function querySessions(
       startedAt: analyticsSessions.startedAt,
       lastSeenAt: analyticsSessions.lastSeenAt,
       eventCount: count(analyticsEvents.id).as("event_count"),
+      pageviewCount:
+        sql<number>`count(${analyticsEvents.id}) filter (where ${analyticsEvents.type} = 'pageview')`.as(
+          "pageview_count",
+        ),
+      interactionCount:
+        sql<number>`count(${analyticsEvents.id}) filter (where ${analyticsEvents.type} in ('click', 'custom'))`.as(
+          "interaction_count",
+        ),
     })
     .from(analyticsSessions)
     .leftJoin(analyticsEvents, eq(analyticsEvents.sessionId, analyticsSessions.id))
@@ -411,6 +584,8 @@ export async function querySessions(
       (r.lastSeenAt.getTime() - r.startedAt.getTime()) / 1000,
     ),
     eventCount: Number(r.eventCount),
+    pageviewCount: Number(r.pageviewCount),
+    interactionCount: Number(r.interactionCount),
   }));
 }
 
