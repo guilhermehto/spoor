@@ -26,6 +26,7 @@ import { eq, and, desc } from "drizzle-orm";
 import { db } from "~/db/index";
 import { projects, analyticsSessions, analyticsEvents } from "~/db/schema";
 import { computeVisitorHash, extractClientIp } from "./visitor";
+import { parseUa } from "./ua";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -228,8 +229,10 @@ export async function persistEvent(opts: {
   visitorHash: string;
   payload: IngestPayload;
   now: Date;
+  /** Raw request UA — parsed to coarse families on session create, never stored. */
+  userAgent: string;
 }): Promise<void> {
-  const { projectId, visitorHash, payload, now } = opts;
+  const { projectId, visitorHash, payload, now, userAgent } = opts;
 
   const openSession = await findOpenSession(projectId, visitorHash, now);
   const resolution = resolveSession(openSession, now);
@@ -254,6 +257,7 @@ export async function persistEvent(opts: {
       lastSeenAt: now,
       entryPath: payload.p,
       referrer: payload.r ?? "",
+      ...parseUa(userAgent),
     });
   }
 

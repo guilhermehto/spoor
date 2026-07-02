@@ -12,7 +12,7 @@
  * analytics_events.  Queries that need unique visitors JOIN through the session.
  */
 
-import { eq, and, gt, gte, lte, ne, sql, desc, asc, count, countDistinct, inArray } from "drizzle-orm";
+import { eq, and, gt, gte, lte, ne, sql, desc, asc, count, countDistinct, inArray, isNotNull } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import type * as schema from "~/db/schema";
 import { analyticsEvents, analyticsSessions, projects } from "~/db/schema";
@@ -795,4 +795,54 @@ export async function querySessionTimeline(
     props: r.props as { [key: string]: JsonValue } | null,
     offsetMs: r.createdAt.getTime() - sessionStart.getTime(),
   }));
+}
+
+// ── Device / browser / OS breakdown ───────────────────────────────────────────
+
+export interface DeviceBreakdown {
+  browsers: Array<{ label: string; count: number }>;
+  os: Array<{ label: string; count: number }>;
+  devices: Array<{ label: string; count: number }>;
+}
+
+/**
+ * Returns browser / OS / device family counts over sessions started within
+ * [from, to], each ranked by count desc (top 10).  Sessions created before the
+ * ua columns existed have NULLs and are excluded.
+ */
+export async function queryDeviceBreakdown(
+  db: DB,
+  projectId: string,
+  range: DateRange,
+): Promise<DeviceBreakdown> {
+  type UaCol =
+    | typeof analyticsSessions.browser
+    | typeof analyticsSessions.os
+    | typeof analyticsSessions.device;
+  const top = (col: UaCol) =>
+    db
+      .select({ label: col, count: count(analyticsSessions.id).as("count") })
+      .from(analyticsSessions)
+      .where(
+        and(
+          eq(analyticsSessions.projectId, projectId),
+          gte(analyticsSessions.startedAt, range.from),
+          lte(analyticsSessions.startedAt, range.to),
+          isNotNull(col),
+        ),
+      )
+      .groupBy(col)
+      .orderBy(desc(count(analyticsSessions.id)), asc(col))
+      .limit(10);
+
+  const [browsers, os, devices] = await Promise.all([
+    top(analyticsSessions.browser),
+    top(analyticsSessions.os),
+    top(analyticsSessions.device),
+  ]);
+
+  const clean = (rows: Array<{ label: string | null; count: number }>) =>
+    rows.map((r) => ({ label: r.label ?? "", count: Number(r.count) }));
+
+  return { browsers: clean(browsers), os: clean(os), devices: clean(devices) };
 }

@@ -1,10 +1,12 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   getOverviewFn,
   getActiveNowFn,
   getHasEventsFn,
+  getDeviceBreakdownFn,
   type OverviewData,
+  type DeviceBreakdownData,
   type RankedRow,
 } from "~/server/analytics-fns";
 import { buildRange, detectPreset, type Preset } from "~/components/analytics/range-picker";
@@ -24,10 +26,13 @@ export const Route = createFileRoute("/dashboard/$projectId/")({
       to: search.to ?? defaultRange.to,
     };
   },
-  loader: async ({ params, deps }): Promise<OverviewData> => {
-    return getOverviewFn({
-      data: { projectId: params.projectId, from: deps.from, to: deps.to },
-    });
+  loader: async ({ params, deps }) => {
+    const input = { projectId: params.projectId, from: deps.from, to: deps.to };
+    const [overview, devices] = await Promise.all([
+      getOverviewFn({ data: input }),
+      getDeviceBreakdownFn({ data: input }),
+    ]);
+    return { overview, devices };
   },
   component: OverviewPage,
 });
@@ -187,17 +192,23 @@ function BarPanel({
   fillClass,
   transformLabel,
   emptyMessage,
+  action,
 }: {
   title: string;
   items: RankedRow[];
   fillClass: string;
   transformLabel?: (label: string) => string;
   emptyMessage: string;
+  /** Optional control rendered right of the title (e.g. dimension toggle). */
+  action?: ReactNode;
 }) {
   const max = Math.max(1, ...items.map((i) => i.count));
   return (
     <div className="bg-card border-2 border-border p-4">
-      <div className="eyebrow mb-3">{title}</div>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="eyebrow">{title}</div>
+        {action}
+      </div>
       {items.length === 0 ? (
         <div className="text-sm text-muted-foreground">{emptyMessage}</div>
       ) : (
@@ -257,11 +268,49 @@ function EventsPanel({ items }: { items: RankedRow[] }) {
   );
 }
 
+const DEVICE_DIMS = [
+  ["browsers", "Browser"],
+  ["os", "OS"],
+  ["devices", "Device"],
+] as const;
+
+function DevicesPanel({ data }: { data: DeviceBreakdownData }) {
+  // ponytail: client-side toggle over the one fetched payload — no refetch per dimension
+  const [dim, setDim] = useState<(typeof DEVICE_DIMS)[number][0]>("browsers");
+  return (
+    <BarPanel
+      title="Devices"
+      items={data[dim]}
+      fillClass="bg-primary"
+      emptyMessage="No device data in this period."
+      action={
+        <div className="flex gap-1">
+          {DEVICE_DIMS.map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setDim(key)}
+              className={`eyebrow px-1.5 py-0.5 ${
+                dim === key ? "bg-muted text-foreground" : "text-muted-foreground"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      }
+    />
+  );
+}
+
 // ── Page ────────────────────────────────────────────────────────────────────
 
 function OverviewPage() {
   const { projectId } = Route.useParams();
-  const data = Route.useLoaderData() as OverviewData;
+  const { overview: data, devices } = Route.useLoaderData() as {
+    overview: OverviewData;
+    devices: DeviceBreakdownData;
+  };
   const search = Route.useSearch() as { from?: string; to?: string };
 
   const defaultRange = buildRange("7d");
@@ -348,6 +397,7 @@ function OverviewPage() {
           emptyMessage="No external referrers in this period."
         />
         <EventsPanel items={data.eventCounts.items} />
+        <DevicesPanel data={devices} />
       </div>
     </div>
   );

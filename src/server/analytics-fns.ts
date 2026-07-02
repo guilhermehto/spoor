@@ -26,6 +26,7 @@ import {
   queryActiveVisitors,
   queryHasAnyEvents,
   queryEventPropBreakdown,
+  queryDeviceBreakdown,
   type DateRange,
   type TimeSeriesBucket,
   type SessionSummary,
@@ -228,6 +229,25 @@ export const getHasEventsFn = createServerFn({ method: "GET" })
     const session = await requireSession();
     await requireOwnedProject(db, data.projectId, session.user.id);
     return queryHasAnyEvents(db, data.projectId);
+  });
+
+// ── Device / browser / OS breakdown ───────────────────────────────────────────
+
+export interface DeviceBreakdownData {
+  browsers: RankedRow[];
+  os: RankedRow[];
+  devices: RankedRow[];
+}
+
+export const getDeviceBreakdownFn = createServerFn({ method: "GET" })
+  .validator((data: { projectId: string; from: string; to: string }) => data)
+  .handler(async ({ data }): Promise<DeviceBreakdownData> => {
+    const session = await requireSession();
+    await requireOwnedProject(db, data.projectId, session.user.id);
+    return queryDeviceBreakdown(db, data.projectId, {
+      from: new Date(data.from),
+      to: new Date(data.to),
+    });
   });
 
 // ── Paginated ranked list ─────────────────────────────────────────────────────

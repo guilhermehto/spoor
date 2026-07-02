@@ -104,7 +104,7 @@ export const Route = createFileRoute("/api/ingest")({
           now,
         );
 
-        await persistEvent({ projectId: project.id, visitorHash, payload, now });
+        await persistEvent({ projectId: project.id, visitorHash, payload, now, userAgent });
 
         return new Response(null, { status: 202, headers: CORS_HEADERS });
       },
