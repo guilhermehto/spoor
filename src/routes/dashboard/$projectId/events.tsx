@@ -22,6 +22,7 @@ import { buildRange } from "~/components/analytics/range-picker";
 // ── Route ─────────────────────────────────────────────────────────────────────
 
 export const Route = createFileRoute("/dashboard/$projectId/events")({
+  head: () => ({ meta: [{ title: "Events · Spoor" }] }),
   loaderDeps: ({
     search,
   }: {

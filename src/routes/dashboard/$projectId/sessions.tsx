@@ -27,6 +27,7 @@ import { Button } from "~/components/ui/button";
 // ── Route ─────────────────────────────────────────────────────────────────────
 
 export const Route = createFileRoute("/dashboard/$projectId/sessions")({
+  head: () => ({ meta: [{ title: "Sessions · Spoor" }] }),
   loaderDeps: ({
     search,
   }: {

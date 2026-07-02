@@ -4,6 +4,7 @@ import { buildRange, detectPreset, type Preset } from "~/components/analytics/ra
 import { TrafficChart } from "~/components/analytics/traffic-chart";
 
 export const Route = createFileRoute("/dashboard/$projectId/")({
+  head: () => ({ meta: [{ title: "Overview · Spoor" }] }),
   loaderDeps: ({
     search,
   }: {
