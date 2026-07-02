@@ -12,7 +12,7 @@
  * analytics_events.  Queries that need unique visitors JOIN through the session.
  */
 
-import { eq, and, gt, gte, lte, ne, sql, desc, asc, count, countDistinct } from "drizzle-orm";
+import { eq, and, gt, gte, lte, ne, sql, desc, asc, count, countDistinct, inArray } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import type * as schema from "~/db/schema";
 import { analyticsEvents, analyticsSessions, projects } from "~/db/schema";
@@ -115,6 +115,84 @@ export async function queryErrorCount(
       ),
     );
   return Number(row?.total ?? 0);
+}
+
+// ── Error groups ──────────────────────────────────────────────────────────────
+
+export interface ErrorGroup {
+  name: string;
+  count: number;
+  lastSeen: Date;
+  samplePath: string;
+  sampleProps: JsonValue | null;
+}
+
+/**
+ * Returns error events (t = "error") within [from, to] grouped by message
+ * (`name`), ranked by count desc (cap `limit`, default 50), each with the
+ * newest event's path/props as a representative sample.
+ */
+export async function queryErrorGroups(
+  db: DB,
+  projectId: string,
+  range: DateRange,
+  opts: { limit?: number } = {},
+): Promise<ErrorGroup[]> {
+  const limit = opts.limit ?? 50;
+  const errorScope = and(
+    eq(analyticsEvents.projectId, projectId),
+    eq(analyticsEvents.type, "error"),
+    gte(analyticsEvents.createdAt, range.from),
+    lte(analyticsEvents.createdAt, range.to),
+  );
+
+  const groups = await db
+    .select({
+      name: analyticsEvents.name,
+      total: count(analyticsEvents.id).as("total"),
+      lastSeen: sql<Date>`max(${analyticsEvents.createdAt})`
+        .mapWith(analyticsEvents.createdAt)
+        .as("last_seen"),
+    })
+    .from(analyticsEvents)
+    .where(errorScope)
+    .groupBy(analyticsEvents.name)
+    .orderBy(desc(count(analyticsEvents.id)), asc(analyticsEvents.name))
+    .limit(limit);
+
+  if (groups.length === 0) return [];
+
+  // ponytail: second DISTINCT ON query for the newest sample per group —
+  // simpler than a lateral join and fine at ≤50 groups.
+  const samples = await db
+    .selectDistinctOn([analyticsEvents.name], {
+      name: analyticsEvents.name,
+      path: analyticsEvents.path,
+      props: analyticsEvents.props,
+    })
+    .from(analyticsEvents)
+    .where(
+      and(
+        errorScope,
+        inArray(
+          analyticsEvents.name,
+          groups.map((g) => g.name),
+        ),
+      ),
+    )
+    .orderBy(asc(analyticsEvents.name), desc(analyticsEvents.createdAt));
+
+  const sampleByName = new Map(samples.map((s) => [s.name, s]));
+  return groups.map((g) => {
+    const sample = sampleByName.get(g.name);
+    return {
+      name: g.name,
+      count: Number(g.total),
+      lastSeen: g.lastSeen,
+      samplePath: sample?.path ?? "",
+      sampleProps: (sample?.props ?? null) as JsonValue | null,
+    };
+  });
 }
 
 // ── Range-wide pageview total ─────────────────────────────────────────────────

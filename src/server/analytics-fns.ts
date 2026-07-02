@@ -13,6 +13,7 @@ import {
   queryTimeSeries,
   queryUniqueVisitors,
   queryErrorCount,
+  queryErrorGroups,
   queryTopPages,
   queryTopReferrers,
   queryEventCounts,
@@ -440,4 +441,53 @@ export const getEventBreakdownFn = createServerFn({ method: "GET" })
     await requireOwnedProject(db, data.projectId, session.user.id);
     const range: DateRange = { from: new Date(data.from), to: new Date(data.to) };
     return queryEventPropBreakdown(db, data.projectId, range, data.name);
+  });
+
+// ── Error groups ──────────────────────────────────────────────────────────────
+
+export interface ErrorGroupRow {
+  name: string;
+  count: number;
+  /** ISO timestamp of the most recent occurrence. */
+  lastSeen: string;
+  samplePath: string;
+  sampleProps: JsonValue | null;
+}
+
+export interface ErrorGroupsData {
+  /** Total error events in range (not capped by grouping). */
+  total: number;
+  /** Groups ranked by count desc, cap 50. */
+  groups: ErrorGroupRow[];
+}
+
+interface ErrorGroupsInput {
+  projectId: string;
+  from: string;
+  to: string;
+}
+
+export const getErrorGroupsFn = createServerFn({ method: "GET" })
+  .validator((data: ErrorGroupsInput) => data)
+  .handler(async ({ data }): Promise<ErrorGroupsData> => {
+    const session = await requireSession();
+    await requireOwnedProject(db, data.projectId, session.user.id);
+
+    const range: DateRange = { from: new Date(data.from), to: new Date(data.to) };
+
+    const [total, groups] = await Promise.all([
+      queryErrorCount(db, data.projectId, range),
+      queryErrorGroups(db, data.projectId, range),
+    ]);
+
+    return {
+      total,
+      groups: groups.map((g) => ({
+        name: g.name,
+        count: g.count,
+        lastSeen: g.lastSeen.toISOString(),
+        samplePath: g.samplePath,
+        sampleProps: g.sampleProps,
+      })),
+    };
   });
