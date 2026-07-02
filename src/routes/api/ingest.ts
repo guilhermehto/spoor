@@ -16,6 +16,8 @@ import {
 } from "~/server/ingest";
 import { computeVisitorHash, extractClientIp } from "~/server/visitor";
 import { rateLimitOk } from "~/server/rate-limit";
+// Side-effect import: starts opt-in retention pruning at server boot.
+import "~/server/retention";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
