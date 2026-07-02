@@ -3,7 +3,7 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: spoor
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-spoor}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
       POSTGRES_DB: spoor
     volumes:
       - spoor-data:/var/lib/postgresql/data
@@ -22,7 +22,7 @@ services:
     ports:
       - "${PORT:-3000}:3000"
     environment:
-      DATABASE_URL: postgres://spoor:${POSTGRES_PASSWORD:-spoor}@db:5432/spoor
+      DATABASE_URL: postgres://spoor:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/spoor
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET must be set}
       BETTER_AUTH_URL: ${APP_URL:-http://localhost:3000}
       APP_URL: ${APP_URL:-http://localhost:3000}
