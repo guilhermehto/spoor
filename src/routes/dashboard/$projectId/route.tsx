@@ -6,7 +6,7 @@ import {
   useLocation,
   useNavigate,
 } from "@tanstack/react-router";
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { getProjectFn, listProjectsFn } from "~/server/projects";
 import {
   buildRange,
@@ -142,14 +142,15 @@ function ProjectLayout() {
 
   const activePreset = detectPreset(from, to);
 
-  // Theme: read + apply persisted choice on mount.
-  // ponytail: class-on-mount; brief flash acceptable.
-  const [theme, setTheme] = useState<"light" | "dark">("light");
-  useEffect(() => {
-    const t = localStorage.getItem("spoor-theme") === "dark" ? "dark" : "light";
-    setTheme(t);
-    document.documentElement.classList.toggle("dark", t === "dark");
-  }, []);
+  // Theme: the inline script in __root.tsx applied the class pre-paint; mirror the DOM here.
+  // SSR renders "light" — a benign hydration mismatch on the toggle is possible for dark users.
+  const [theme, setTheme] = useState<"light" | "dark">(() =>
+    typeof document === "undefined"
+      ? "light"
+      : document.documentElement.classList.contains("dark")
+        ? "dark"
+        : "light",
+  );
   function setMode(t: "light" | "dark") {
     setTheme(t);
     document.documentElement.classList.toggle("dark", t === "dark");
