@@ -81,6 +81,24 @@ const MIME = {
   '.woff2':'font/woff2',
 };
 
+// ponytail: no CSP, needs nonce plumbing through SSR
+const SECURITY_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+};
+
+// Set via setHeader before any writeHead: writeHead merges (its own keys win),
+// and the SSR header copy may overwrite — app-provided headers always win.
+function applySecurityHeaders(req, res) {
+  for (const [k, v] of Object.entries(SECURITY_HEADERS)) {
+    if (!res.hasHeader(k)) res.setHeader(k, v);
+  }
+  if (req.headers['x-forwarded-proto'] === 'https' && !res.hasHeader('Strict-Transport-Security')) {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000');
+  }
+}
+
 function serveStatic(urlPath, res) {
   // Resolve the filesystem path; reject any path traversal attempts.
   const rel = decodeURIComponent(urlPath);
@@ -107,6 +125,7 @@ function serveStatic(urlPath, res) {
 }
 
 const server = http.createServer(async (req, res) => {
+  applySecurityHeaders(req, res);
   const urlPath = (req.url ?? '/').split('?')[0];
 
   // Serve static client assets before hitting the SSR handler.
