@@ -13,20 +13,33 @@ describe("utcDateString", () => {
 });
 
 describe("extractClientIp", () => {
-  it("returns left-most address from X-Forwarded-For", () => {
-    expect(extractClientIp("1.2.3.4, 5.6.7.8", "9.9.9.9")).toBe("1.2.3.4");
+  it("returns the single entry when only one is present", () => {
+    expect(extractClientIp("1.2.3.4", "9.9.9.9")).toBe("1.2.3.4");
   });
 
-  it("trims whitespace from the left-most address", () => {
-    expect(extractClientIp(" 10.0.0.1 , 10.0.0.2", "9.9.9.9")).toBe(
-      "10.0.0.1",
+  it("returns right-most address from a multi-hop X-Forwarded-For", () => {
+    expect(extractClientIp("1.2.3.4, 5.6.7.8", "9.9.9.9")).toBe("5.6.7.8");
+    expect(extractClientIp("6.6.6.6, 1.2.3.4, 5.6.7.8", "9.9.9.9")).toBe(
+      "5.6.7.8",
     );
   });
 
-  it("falls back to socket address when header is absent", () => {
+  it("trims whitespace around entries", () => {
+    expect(extractClientIp(" 10.0.0.1 , 10.0.0.2 ", "9.9.9.9")).toBe(
+      "10.0.0.2",
+    );
+  });
+
+  it("skips trailing commas and empty entries", () => {
+    expect(extractClientIp("1.2.3.4, 5.6.7.8,", "9.9.9.9")).toBe("5.6.7.8");
+    expect(extractClientIp("1.2.3.4,, ", "9.9.9.9")).toBe("1.2.3.4");
+  });
+
+  it("falls back to socket address when header is absent or empty", () => {
     expect(extractClientIp(null, "9.9.9.9")).toBe("9.9.9.9");
     expect(extractClientIp(undefined, "9.9.9.9")).toBe("9.9.9.9");
     expect(extractClientIp("", "9.9.9.9")).toBe("9.9.9.9");
+    expect(extractClientIp(" , ,", "9.9.9.9")).toBe("9.9.9.9");
   });
 });
 

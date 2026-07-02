@@ -58,16 +58,26 @@ export async function computeVisitorHash(
 
 /**
  * Extracts the client IP from request headers.
- * Uses the left-most address in X-Forwarded-For when present;
- * falls back to the socket address string.
+ *
+ * Reverse proxies (Traefik, nginx) APPEND the connecting peer's address to
+ * X-Forwarded-For, so the left-most entries are whatever the client sent —
+ * attacker-controlled. We take the RIGHT-most non-empty entry: the hop our
+ * own proxy appended. Falls back to the socket address when absent.
+ *
+ * Residual limitation: with no proxy at all, a directly-sent header is still
+ * client-controlled; no-proxy deployments only get the socket address when
+ * the header is absent.
  */
 export function extractClientIp(
   xForwardedFor: string | null | undefined,
   socketAddress: string,
 ): string {
   if (xForwardedFor) {
-    const first = xForwardedFor.split(",")[0]?.trim();
-    if (first) return first;
+    const parts = xForwardedFor.split(",");
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const entry = parts[i]?.trim();
+      if (entry) return entry;
+    }
   }
   return socketAddress;
 }
