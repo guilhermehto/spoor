@@ -160,7 +160,7 @@ function OverviewPage() {
   return (
     <div className="flex flex-col gap-[18px]">
       {/* Metric cards */}
-      <div className="grid grid-cols-2 gap-[18px] sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-[18px] sm:grid-cols-5">
         <MetricCard
           label="Page views"
           value={metrics.pageViews.toLocaleString()}
@@ -180,6 +180,11 @@ function OverviewPage() {
           label="Avg. session"
           value={formatAvg(metrics.avgSessionSeconds)}
           delta={metrics.deltas.avgSessionSeconds}
+        />
+        <MetricCard
+          label="Bounce rate"
+          value={`${metrics.bounceRate}%`}
+          delta={metrics.deltas.bounceRate}
         />
       </div>
 

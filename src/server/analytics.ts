@@ -200,6 +200,37 @@ export async function queryAvgSessionDuration(
   return Math.round(Number(row?.avgSeconds ?? 0));
 }
 
+// ── Bounce rate ───────────────────────────────────────────────────────────────
+
+/**
+ * Returns the percentage (0-100, rounded) of sessions started within
+ * [from, to] that recorded exactly one pageview event.  Returns 0 when the
+ * range contains no sessions.
+ */
+export async function queryBounceRate(
+  db: DB,
+  projectId: string,
+  range: DateRange,
+): Promise<number> {
+  // ponytail: correlated subquery per session — fine at self-hosted volumes,
+  // switch to a LEFT JOIN + GROUP BY if it shows up in slow-query logs.
+  const [row] = await db
+    .select({
+      pct: sql<number | null>`round(avg(case when (select count(*) from ${analyticsEvents} where ${analyticsEvents.sessionId} = ${analyticsSessions.id} and ${analyticsEvents.type} = 'pageview') = 1 then 100.0 else 0 end))`.as(
+        "pct",
+      ),
+    })
+    .from(analyticsSessions)
+    .where(
+      and(
+        eq(analyticsSessions.projectId, projectId),
+        gte(analyticsSessions.startedAt, range.from),
+        lte(analyticsSessions.startedAt, range.to),
+      ),
+    );
+  return Number(row?.pct ?? 0);
+}
+
 // ── Time-series: pageviews + unique visitors per bucket ───────────────────────
 
 export interface TimeSeriesBucket {

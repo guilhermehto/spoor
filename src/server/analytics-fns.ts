@@ -21,6 +21,7 @@ import {
   queryPageviewTotal,
   querySessionCount,
   queryAvgSessionDuration,
+  queryBounceRate,
   queryEventPropBreakdown,
   type DateRange,
   type TimeSeriesBucket,
@@ -74,11 +75,14 @@ export interface OverviewData {
     uniqueVisitors: number;
     sessions: number;
     avgSessionSeconds: number;
+    /** Percentage (0-100) of sessions with exactly one pageview. */
+    bounceRate: number;
     deltas: {
       pageViews: number;
       uniqueVisitors: number;
       sessions: number;
       avgSessionSeconds: number;
+      bounceRate: number;
     };
   };
 }
@@ -121,10 +125,12 @@ export const getOverviewFn = createServerFn({ method: "GET" })
       pageViews,
       sessions,
       avgSessionSeconds,
+      bounceRate,
       prevPageViews,
       prevVisitors,
       prevSessions,
       prevAvg,
+      prevBounce,
     ] = await Promise.all([
       queryTimeSeries(db, data.projectId, range, filters),
       queryUniqueVisitors(db, data.projectId, range, filters),
@@ -135,10 +141,12 @@ export const getOverviewFn = createServerFn({ method: "GET" })
       queryPageviewTotal(db, data.projectId, range, filters),
       querySessionCount(db, data.projectId, range),
       queryAvgSessionDuration(db, data.projectId, range),
+      queryBounceRate(db, data.projectId, range),
       queryPageviewTotal(db, data.projectId, prevRange, filters),
       queryUniqueVisitors(db, data.projectId, prevRange, filters),
       querySessionCount(db, data.projectId, prevRange),
       queryAvgSessionDuration(db, data.projectId, prevRange),
+      queryBounceRate(db, data.projectId, prevRange),
     ]);
 
     const topPages: RankedPage = {
@@ -177,11 +185,13 @@ export const getOverviewFn = createServerFn({ method: "GET" })
       uniqueVisitors,
       sessions,
       avgSessionSeconds,
+      bounceRate,
       deltas: {
         pageViews: deltaPct(pageViews, prevPageViews),
         uniqueVisitors: deltaPct(uniqueVisitors, prevVisitors),
         sessions: deltaPct(sessions, prevSessions),
         avgSessionSeconds: deltaPct(avgSessionSeconds, prevAvg),
+        bounceRate: deltaPct(bounceRate, prevBounce),
       },
     };
 
