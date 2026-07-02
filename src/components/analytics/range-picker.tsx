@@ -167,6 +167,7 @@ export function RangePicker({ from, to }: RangePickerProps) {
           value={toDateInput(to)}
           onChange={(e) => applyCustom("to", e.target.value)}
         />
+        <span className="text-muted-foreground text-xs">Dates are UTC</span>
       </div>
     </div>
   );

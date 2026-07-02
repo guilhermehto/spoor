@@ -297,7 +297,8 @@ function ProjectLayout() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Range segmented control */}
+            {/* Range segmented control — presets bucket by UTC day */}
+            <span className="eyebrow">Range · UTC</span>
             <div className="flex items-center border-2 border-border bg-muted">
               {RANGES.map((p) => (
                 <button
