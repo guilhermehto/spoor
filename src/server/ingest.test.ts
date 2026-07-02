@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   resolveSession,
   isBot,
+  normalizePath,
   parseAndValidate,
   SESSION_TIMEOUT_MS,
   type OpenSession,
@@ -114,6 +115,49 @@ describe("isBot", () => {
       ),
     ).toBe(false);
     expect(isBot("")).toBe(false);
+  });
+});
+
+// ── normalizePath ──────────────────────────────────────────────────────────────
+
+describe("normalizePath", () => {
+  it("passes a plain path through untouched", () => {
+    expect(normalizePath("/pricing")).toEqual({ path: "/pricing", utm: {} });
+  });
+
+  it("strips a query string", () => {
+    expect(normalizePath("/pricing?ref=nav").path).toBe("/pricing");
+  });
+
+  it("strips a hash fragment", () => {
+    expect(normalizePath("/pricing#faq").path).toBe("/pricing");
+  });
+
+  it("strips both query and hash", () => {
+    expect(normalizePath("/pricing?a=1&b=2#faq").path).toBe("/pricing");
+  });
+
+  it("extracts utm params, decoding url-encoded values", () => {
+    const { path, utm } = normalizePath(
+      "/landing?utm_source=news%20letter&utm_medium=email&utm_campaign=launch",
+    );
+    expect(path).toBe("/landing");
+    expect(utm).toEqual({ source: "news letter", medium: "email", campaign: "launch" });
+  });
+
+  it("drops empty utm params", () => {
+    const { utm } = normalizePath("/x?utm_source=&utm_medium=cpc");
+    expect(utm.source).toBeUndefined();
+    expect(utm.medium).toBe("cpc");
+  });
+
+  it("truncates utm values to 255 chars", () => {
+    const { utm } = normalizePath(`/x?utm_source=${"a".repeat(300)}`);
+    expect(utm.source).toHaveLength(255);
+  });
+
+  it("falls back to stripping after ? or # on garbage input", () => {
+    expect(normalizePath("http://[bad?utm_source=x#y").path).toBe("http://[bad");
   });
 });
 

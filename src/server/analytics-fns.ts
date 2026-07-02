@@ -27,6 +27,7 @@ import {
   queryHasAnyEvents,
   queryEventPropBreakdown,
   queryDeviceBreakdown,
+  queryUtmBreakdown,
   type DateRange,
   type TimeSeriesBucket,
   type SessionSummary,
@@ -245,6 +246,25 @@ export const getDeviceBreakdownFn = createServerFn({ method: "GET" })
     const session = await requireSession();
     await requireOwnedProject(db, data.projectId, session.user.id);
     return queryDeviceBreakdown(db, data.projectId, {
+      from: new Date(data.from),
+      to: new Date(data.to),
+    });
+  });
+
+// ── UTM / campaign breakdown ──────────────────────────────────────────────────
+
+export interface UtmBreakdownData {
+  sources: RankedRow[];
+  mediums: RankedRow[];
+  campaigns: RankedRow[];
+}
+
+export const getUtmBreakdownFn = createServerFn({ method: "GET" })
+  .validator((data: { projectId: string; from: string; to: string }) => data)
+  .handler(async ({ data }): Promise<UtmBreakdownData> => {
+    const session = await requireSession();
+    await requireOwnedProject(db, data.projectId, session.user.id);
+    return queryUtmBreakdown(db, data.projectId, {
       from: new Date(data.from),
       to: new Date(data.to),
     });

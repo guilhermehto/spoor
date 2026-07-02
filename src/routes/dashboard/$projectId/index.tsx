@@ -5,8 +5,10 @@ import {
   getActiveNowFn,
   getHasEventsFn,
   getDeviceBreakdownFn,
+  getUtmBreakdownFn,
   type OverviewData,
   type DeviceBreakdownData,
+  type UtmBreakdownData,
   type RankedRow,
 } from "~/server/analytics-fns";
 import { buildRange, detectPreset, type Preset } from "~/components/analytics/range-picker";
@@ -28,11 +30,12 @@ export const Route = createFileRoute("/dashboard/$projectId/")({
   },
   loader: async ({ params, deps }) => {
     const input = { projectId: params.projectId, from: deps.from, to: deps.to };
-    const [overview, devices] = await Promise.all([
+    const [overview, devices, campaigns] = await Promise.all([
       getOverviewFn({ data: input }),
       getDeviceBreakdownFn({ data: input }),
+      getUtmBreakdownFn({ data: input }),
     ]);
-    return { overview, devices };
+    return { overview, devices, campaigns };
   },
   component: OverviewPage,
 });
@@ -303,13 +306,49 @@ function DevicesPanel({ data }: { data: DeviceBreakdownData }) {
   );
 }
 
+const UTM_DIMS = [
+  ["sources", "Source"],
+  ["mediums", "Medium"],
+  ["campaigns", "Campaign"],
+] as const;
+
+function CampaignsPanel({ data }: { data: UtmBreakdownData }) {
+  // ponytail: client-side toggle over the one fetched payload — no refetch per dimension
+  const [dim, setDim] = useState<(typeof UTM_DIMS)[number][0]>("sources");
+  return (
+    <BarPanel
+      title="Campaigns"
+      items={data[dim]}
+      fillClass="bg-secondary"
+      emptyMessage="No campaign traffic in this range."
+      action={
+        <div className="flex gap-1">
+          {UTM_DIMS.map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setDim(key)}
+              className={`eyebrow px-1.5 py-0.5 ${
+                dim === key ? "bg-muted text-foreground" : "text-muted-foreground"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      }
+    />
+  );
+}
+
 // ── Page ────────────────────────────────────────────────────────────────────
 
 function OverviewPage() {
   const { projectId } = Route.useParams();
-  const { overview: data, devices } = Route.useLoaderData() as {
+  const { overview: data, devices, campaigns } = Route.useLoaderData() as {
     overview: OverviewData;
     devices: DeviceBreakdownData;
+    campaigns: UtmBreakdownData;
   };
   const search = Route.useSearch() as { from?: string; to?: string };
 
@@ -398,6 +437,7 @@ function OverviewPage() {
         />
         <EventsPanel items={data.eventCounts.items} />
         <DevicesPanel data={devices} />
+        <CampaignsPanel data={campaigns} />
       </div>
     </div>
   );

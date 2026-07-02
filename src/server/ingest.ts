@@ -91,6 +91,36 @@ export function isBot(userAgent: string): boolean {
   return BOT_UA_RE.test(userAgent);
 }
 
+/**
+ * Normalizes a raw snippet path (may include query/hash) to a canonical
+ * pathname, extracting utm_source/utm_medium/utm_campaign along the way.
+ * The snippet sends pathname+search+hash; deployed versions can't be fixed,
+ * so normalization happens server-side at ingest.
+ */
+export function normalizePath(rawPath: string): {
+  path: string;
+  utm: { source?: string; medium?: string; campaign?: string };
+} {
+  try {
+    const url = new URL(rawPath, "http://x");
+    const utm: { source?: string; medium?: string; campaign?: string } = {};
+    const pick = (key: string) => {
+      const v = url.searchParams.get(key);
+      return v ? v.slice(0, 255) : undefined;
+    };
+    const source = pick("utm_source");
+    const medium = pick("utm_medium");
+    const campaign = pick("utm_campaign");
+    if (source) utm.source = source;
+    if (medium) utm.medium = medium;
+    if (campaign) utm.campaign = campaign;
+    return { path: url.pathname, utm };
+  } catch {
+    // ponytail: unparseable input just loses its query/hash — no utm recovery attempted
+    return { path: rawPath.split(/[?#]/, 1)[0]!, utm: {} };
+  }
+}
+
 // ── Validation ────────────────────────────────────────────────────────────────
 
 export type ValidationResult =
@@ -233,6 +263,7 @@ export async function persistEvent(opts: {
   userAgent: string;
 }): Promise<void> {
   const { projectId, visitorHash, payload, now, userAgent } = opts;
+  const { path, utm } = normalizePath(payload.p);
 
   const openSession = await findOpenSession(projectId, visitorHash, now);
   const resolution = resolveSession(openSession, now);
@@ -255,7 +286,7 @@ export async function persistEvent(opts: {
       visitorHash,
       startedAt: now,
       lastSeenAt: now,
-      entryPath: payload.p,
+      entryPath: path,
       referrer: payload.r ?? "",
       ...parseUa(userAgent),
     });
@@ -268,7 +299,10 @@ export async function persistEvent(opts: {
     sessionId,
     type: payload.t,
     name: payload.n ?? "",
-    path: payload.p,
+    path,
+    utmSource: utm.source ?? null,
+    utmMedium: utm.medium ?? null,
+    utmCampaign: utm.campaign ?? null,
     host: payload.h,
     referrer: payload.r ?? "",
     props: payload.props ?? null,

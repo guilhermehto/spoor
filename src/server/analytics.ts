@@ -846,3 +846,54 @@ export async function queryDeviceBreakdown(
 
   return { browsers: clean(browsers), os: clean(os), devices: clean(devices) };
 }
+
+// ── UTM / campaign breakdown ──────────────────────────────────────────────────
+
+export interface UtmBreakdown {
+  sources: Array<{ label: string; count: number }>;
+  mediums: Array<{ label: string; count: number }>;
+  campaigns: Array<{ label: string; count: number }>;
+}
+
+/**
+ * Returns utm_source / utm_medium / utm_campaign counts over pageview events
+ * within [from, to], each ranked by count desc (top 10).  Events without the
+ * respective param are NULL and excluded.
+ */
+export async function queryUtmBreakdown(
+  db: DB,
+  projectId: string,
+  range: DateRange,
+): Promise<UtmBreakdown> {
+  type UtmCol =
+    | typeof analyticsEvents.utmSource
+    | typeof analyticsEvents.utmMedium
+    | typeof analyticsEvents.utmCampaign;
+  const top = (col: UtmCol) =>
+    db
+      .select({ label: col, count: count(analyticsEvents.id).as("count") })
+      .from(analyticsEvents)
+      .where(
+        and(
+          eq(analyticsEvents.projectId, projectId),
+          eq(analyticsEvents.type, "pageview"),
+          gte(analyticsEvents.createdAt, range.from),
+          lte(analyticsEvents.createdAt, range.to),
+          isNotNull(col),
+        ),
+      )
+      .groupBy(col)
+      .orderBy(desc(count(analyticsEvents.id)), asc(col))
+      .limit(10);
+
+  const [sources, mediums, campaigns] = await Promise.all([
+    top(analyticsEvents.utmSource),
+    top(analyticsEvents.utmMedium),
+    top(analyticsEvents.utmCampaign),
+  ]);
+
+  const clean = (rows: Array<{ label: string | null; count: number }>) =>
+    rows.map((r) => ({ label: r.label ?? "", count: Number(r.count) }));
+
+  return { sources: clean(sources), mediums: clean(mediums), campaigns: clean(campaigns) };
+}
