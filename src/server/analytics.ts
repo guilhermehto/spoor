@@ -12,7 +12,7 @@
  * analytics_events.  Queries that need unique visitors JOIN through the session.
  */
 
-import { eq, and, gte, lte, ne, sql, desc, asc, count, countDistinct } from "drizzle-orm";
+import { eq, and, gt, gte, lte, ne, sql, desc, asc, count, countDistinct } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import type * as schema from "~/db/schema";
 import { analyticsEvents, analyticsSessions, projects } from "~/db/schema";
@@ -229,6 +229,26 @@ export async function queryBounceRate(
       ),
     );
   return Number(row?.pct ?? 0);
+}
+
+// ── Live active visitors ──────────────────────────────────────────────────────
+
+/**
+ * Returns the count of distinct visitors seen in the last 5 minutes.
+ */
+export async function queryActiveVisitors(db: DB, projectId: string): Promise<number> {
+  const [row] = await db
+    .select({
+      active: countDistinct(analyticsSessions.visitorHash).as("active"),
+    })
+    .from(analyticsSessions)
+    .where(
+      and(
+        eq(analyticsSessions.projectId, projectId),
+        gt(analyticsSessions.lastSeenAt, sql`now() - interval '5 minutes'`),
+      ),
+    );
+  return Number(row?.active ?? 0);
 }
 
 // ── Time-series: pageviews + unique visitors per bucket ───────────────────────

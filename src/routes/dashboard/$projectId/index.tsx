@@ -1,5 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { getOverviewFn, type OverviewData, type RankedRow } from "~/server/analytics-fns";
+import { useEffect, useState } from "react";
+import {
+  getOverviewFn,
+  getActiveNowFn,
+  type OverviewData,
+  type RankedRow,
+} from "~/server/analytics-fns";
 import { buildRange, detectPreset, type Preset } from "~/components/analytics/range-picker";
 import { TrafficChart } from "~/components/analytics/traffic-chart";
 
@@ -64,6 +70,36 @@ function MetricCard({ label, value, delta }: { label: string; value: string; del
         </span>{" "}
         <span className="text-muted-foreground">vs. prev.</span>
       </div>
+    </div>
+  );
+}
+
+function ActiveNow({ projectId }: { projectId: string }) {
+  const [count, setCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const tick = () => {
+      getActiveNowFn({ data: { projectId } })
+        .then((n) => {
+          if (!cancelled) setCount(n);
+        })
+        .catch(() => {});
+    };
+    tick();
+    // ponytail: 30s poll, websockets overkill
+    const id = setInterval(tick, 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [projectId]);
+
+  if (count === null) return null;
+  return (
+    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-primary" />
+      <span className="tabular-nums">{count.toLocaleString()}</span> active now
     </div>
   );
 }
@@ -147,6 +183,7 @@ function EventsPanel({ items }: { items: RankedRow[] }) {
 // ── Page ────────────────────────────────────────────────────────────────────
 
 function OverviewPage() {
+  const { projectId } = Route.useParams();
   const data = Route.useLoaderData() as OverviewData;
   const search = Route.useSearch() as { from?: string; to?: string };
 
@@ -159,6 +196,8 @@ function OverviewPage() {
 
   return (
     <div className="flex flex-col gap-[18px]">
+      {/* Live indicator */}
+      <ActiveNow projectId={projectId} />
       {/* Metric cards */}
       <div className="grid grid-cols-2 gap-[18px] sm:grid-cols-5">
         <MetricCard

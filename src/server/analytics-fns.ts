@@ -22,6 +22,7 @@ import {
   querySessionCount,
   queryAvgSessionDuration,
   queryBounceRate,
+  queryActiveVisitors,
   queryEventPropBreakdown,
   type DateRange,
   type TimeSeriesBucket,
@@ -204,6 +205,16 @@ export const getOverviewFn = createServerFn({ method: "GET" })
       eventCounts,
       metrics,
     };
+  });
+
+// ── Live active visitors ──────────────────────────────────────────────────────
+
+export const getActiveNowFn = createServerFn({ method: "GET" })
+  .validator((data: { projectId: string }) => data)
+  .handler(async ({ data }): Promise<number> => {
+    const session = await requireSession();
+    await requireOwnedProject(db, data.projectId, session.user.id);
+    return queryActiveVisitors(db, data.projectId);
   });
 
 // ── Paginated ranked list ─────────────────────────────────────────────────────
