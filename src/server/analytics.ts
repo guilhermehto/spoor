@@ -251,6 +251,21 @@ export async function queryActiveVisitors(db: DB, projectId: string): Promise<nu
   return Number(row?.active ?? 0);
 }
 
+// ── Any-event existence check ─────────────────────────────────────────────────
+
+/**
+ * Returns whether the project has recorded at least one event, ever.
+ * Powers the first-event onboarding callout.
+ */
+export async function queryHasAnyEvents(db: DB, projectId: string): Promise<boolean> {
+  const rows = await db
+    .select({ one: sql<number>`1` })
+    .from(analyticsEvents)
+    .where(eq(analyticsEvents.projectId, projectId))
+    .limit(1);
+  return rows.length > 0;
+}
+
 // ── Time-series: pageviews + unique visitors per bucket ───────────────────────
 
 export interface TimeSeriesBucket {

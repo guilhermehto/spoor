@@ -23,6 +23,7 @@ import {
   queryAvgSessionDuration,
   queryBounceRate,
   queryActiveVisitors,
+  queryHasAnyEvents,
   queryEventPropBreakdown,
   type DateRange,
   type TimeSeriesBucket,
@@ -216,6 +217,16 @@ export const getActiveNowFn = createServerFn({ method: "GET" })
     const session = await requireSession();
     await requireOwnedProject(db, data.projectId, session.user.id);
     return queryActiveVisitors(db, data.projectId);
+  });
+
+// ── Any-event existence check ─────────────────────────────────────────────────
+
+export const getHasEventsFn = createServerFn({ method: "GET" })
+  .validator((data: { projectId: string }) => data)
+  .handler(async ({ data }): Promise<boolean> => {
+    const session = await requireSession();
+    await requireOwnedProject(db, data.projectId, session.user.id);
+    return queryHasAnyEvents(db, data.projectId);
   });
 
 // ── Paginated ranked list ─────────────────────────────────────────────────────

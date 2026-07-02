@@ -1,13 +1,15 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
   getOverviewFn,
   getActiveNowFn,
+  getHasEventsFn,
   type OverviewData,
   type RankedRow,
 } from "~/server/analytics-fns";
 import { buildRange, detectPreset, type Preset } from "~/components/analytics/range-picker";
 import { TrafficChart } from "~/components/analytics/traffic-chart";
+import { Button } from "~/components/ui/button";
 
 export const Route = createFileRoute("/dashboard/$projectId/")({
   head: () => ({ meta: [{ title: "Overview · Spoor" }] }),
@@ -126,6 +128,59 @@ function ActiveNow({ projectId }: { projectId: string }) {
   );
 }
 
+function OnboardingCallout({ projectId }: { projectId: string }) {
+  const router = useRouter();
+  const [hasEvents, setHasEvents] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getHasEventsFn({ data: { projectId } })
+      .then((has) => {
+        if (!cancelled) setHasEvents(has);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
+
+  useEffect(() => {
+    if (hasEvents !== false) return;
+    // ponytail: 5s poll while waiting for the first event; interval dies once it lands
+    const id = setInterval(() => {
+      getHasEventsFn({ data: { projectId } })
+        .then((has) => {
+          if (has) {
+            setHasEvents(true);
+            void router.invalidate();
+          }
+        })
+        .catch(() => {});
+    }, 5_000);
+    return () => clearInterval(id);
+  }, [hasEvents, projectId, router]);
+
+  if (hasEvents !== false) return null;
+  return (
+    <div className="bg-card border-2 border-primary p-6 flex flex-col items-start gap-2">
+      <div className="text-lg font-bold text-foreground">Waiting for your first event…</div>
+      <p className="text-sm text-muted-foreground">
+        Install the tracking snippet on your site — data appears here as soon as the first
+        event arrives.
+      </p>
+      <Button size="sm" asChild>
+        <Link
+          to="/dashboard/$projectId/setup"
+          params={{ projectId }}
+          search={{ from: undefined, to: undefined }}
+        >
+          Get the snippet →
+        </Link>
+      </Button>
+    </div>
+  );
+}
+
 function BarPanel({
   title,
   items,
@@ -218,6 +273,8 @@ function OverviewPage() {
 
   return (
     <div className="flex flex-col gap-[18px]">
+      {/* First-event onboarding */}
+      <OnboardingCallout projectId={projectId} />
       {/* Live indicator */}
       <ActiveNow projectId={projectId} />
       {/* Metric cards */}
