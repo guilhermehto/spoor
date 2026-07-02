@@ -1,24 +1,9 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { Button } from "~/components/ui/button";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/")({
-  component: HomePage,
+  // Send everyone to the dashboard; its guard bounces unauthenticated
+  // visitors to /login, so no session check is needed here.
+  beforeLoad: () => {
+    throw redirect({ to: "/dashboard" });
+  },
 });
-
-function HomePage() {
-  return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-6 bg-background p-8">
-      <div className="flex flex-col items-center gap-2 text-center">
-        <h1 className="text-4xl font-bold tracking-tight text-foreground">
-          Spoor
-        </h1>
-        <p className="text-muted-foreground">
-          Self-hosted, privacy-first web analytics.
-        </p>
-      </div>
-      <Button asChild>
-        <Link to="/login">Get Started</Link>
-      </Button>
-    </main>
-  );
-}
