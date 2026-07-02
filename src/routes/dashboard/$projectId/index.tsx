@@ -58,17 +58,39 @@ function referrerHost(ref: string): string {
 
 // ── Pieces ──────────────────────────────────────────────────────────────────
 
-function MetricCard({ label, value, delta }: { label: string; value: string; delta: number }) {
-  const up = delta >= 0;
+function MetricCard({
+  label,
+  value,
+  delta,
+  current,
+}: {
+  label: string;
+  value: string;
+  /** Percent change vs. previous window; null = no baseline. */
+  delta: number | null;
+  /** Raw current value — decides "new" vs. "—" when delta is null. */
+  current: number;
+}) {
+  const up = (delta ?? 0) >= 0;
   return (
     <div className="bg-card border-2 border-border p-4 flex flex-col gap-2">
       <div className="eyebrow">{label}</div>
       <div className="metric text-foreground">{value}</div>
       <div className="text-xs">
-        <span className={up ? "text-primary" : "text-[var(--color-negative)]"}>
-          {up ? "▲" : "▼"} {Math.abs(delta)}%
-        </span>{" "}
-        <span className="text-muted-foreground">vs. prev.</span>
+        {delta === null ? (
+          current > 0 ? (
+            <span className="eyebrow bg-muted px-1.5 py-0.5 text-muted-foreground">new</span>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          )
+        ) : (
+          <>
+            <span className={up ? "text-primary" : "text-[var(--color-negative)]"}>
+              {up ? "▲" : "▼"} {Math.abs(delta)}%
+            </span>{" "}
+            <span className="text-muted-foreground">vs. prev.</span>
+          </>
+        )}
       </div>
     </div>
   );
@@ -204,26 +226,31 @@ function OverviewPage() {
           label="Page views"
           value={metrics.pageViews.toLocaleString()}
           delta={metrics.deltas.pageViews}
+          current={metrics.pageViews}
         />
         <MetricCard
           label="Unique visitors"
           value={metrics.uniqueVisitors.toLocaleString()}
           delta={metrics.deltas.uniqueVisitors}
+          current={metrics.uniqueVisitors}
         />
         <MetricCard
           label="Sessions"
           value={metrics.sessions.toLocaleString()}
           delta={metrics.deltas.sessions}
+          current={metrics.sessions}
         />
         <MetricCard
           label="Avg. session"
           value={formatAvg(metrics.avgSessionSeconds)}
           delta={metrics.deltas.avgSessionSeconds}
+          current={metrics.avgSessionSeconds}
         />
         <MetricCard
           label="Bounce rate"
           value={`${metrics.bounceRate}%`}
           delta={metrics.deltas.bounceRate}
+          current={metrics.bounceRate}
         />
       </div>
 

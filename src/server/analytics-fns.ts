@@ -78,12 +78,13 @@ export interface OverviewData {
     avgSessionSeconds: number;
     /** Percentage (0-100) of sessions with exactly one pageview. */
     bounceRate: number;
+    /** Percent change vs. the previous window; null when there is no baseline (prev = 0). */
     deltas: {
-      pageViews: number;
-      uniqueVisitors: number;
-      sessions: number;
-      avgSessionSeconds: number;
-      bounceRate: number;
+      pageViews: number | null;
+      uniqueVisitors: number | null;
+      sessions: number | null;
+      avgSessionSeconds: number | null;
+      bounceRate: number | null;
     };
   };
 }
@@ -178,8 +179,8 @@ export const getOverviewFn = createServerFn({ method: "GET" })
       hasMore: rawEvents.length > RANKED_PAGE_SIZE,
     };
 
-    const deltaPct = (cur: number, prev: number): number =>
-      prev > 0 ? Math.round(((cur - prev) / prev) * 100) : 0;
+    const deltaPct = (cur: number, prev: number): number | null =>
+      prev > 0 ? Math.round(((cur - prev) / prev) * 100) : null;
 
     const metrics: OverviewData["metrics"] = {
       pageViews,
