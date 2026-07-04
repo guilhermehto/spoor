@@ -2,6 +2,8 @@
 
 Self-hosted, cookieless web analytics. Drop one script tag on any site; see page views, clicks, custom events, and session timelines in a private dashboard.
 
+**Docs:** <https://guilhermehto.github.io/spoor/> — built from [`docs/`](docs/) with VitePress, deployed by the `docs.yml` workflow (one-time setup: repo **Settings → Pages → Source: GitHub Actions**).
+
 ## Features
 
 - Multi-project: one Spoor instance, many sites
