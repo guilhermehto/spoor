@@ -23,3 +23,7 @@ pnpm-debug.log*
 
 # Build artifacts
 *.tsbuildinfo
+
+# VitePress
+docs/.vitepress/dist/
+docs/.vitepress/cache/
