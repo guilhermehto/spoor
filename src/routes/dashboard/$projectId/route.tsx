@@ -6,7 +6,7 @@ import {
   useLocation,
   useNavigate,
 } from "@tanstack/react-router";
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { getProjectFn, listProjectsFn } from "~/server/projects";
 import {
   buildRange,
@@ -66,6 +66,13 @@ const ICONS = {
   ),
   sessions: <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />,
   events: <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />,
+  errors: (
+    <>
+      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+      <line x1="12" y1="9" x2="12" y2="13" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </>
+  ),
   referrers: (
     <>
       <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
@@ -110,6 +117,7 @@ const NAV_ITEMS = [
   { label: "Overview", to: "/dashboard/$projectId", exact: true, icon: "overview" },
   { label: "Sessions", to: "/dashboard/$projectId/sessions", exact: false, icon: "sessions" },
   { label: "Events", to: "/dashboard/$projectId/events", exact: false, icon: "events" },
+  { label: "Errors", to: "/dashboard/$projectId/errors", exact: false, icon: "errors" },
 ] as const;
 
 const navLink =
@@ -136,20 +144,23 @@ function ProjectLayout() {
     ? "Sessions"
     : pathname.endsWith("/events")
       ? "Events"
-      : pathname.endsWith("/setup")
-        ? "Settings"
-        : "Overview";
+      : pathname.endsWith("/errors")
+        ? "Errors"
+        : pathname.endsWith("/setup")
+          ? "Settings"
+          : "Overview";
 
   const activePreset = detectPreset(from, to);
 
-  // Theme: read + apply persisted choice on mount.
-  // ponytail: class-on-mount; brief flash acceptable.
-  const [theme, setTheme] = useState<"light" | "dark">("light");
-  useEffect(() => {
-    const t = localStorage.getItem("spoor-theme") === "dark" ? "dark" : "light";
-    setTheme(t);
-    document.documentElement.classList.toggle("dark", t === "dark");
-  }, []);
+  // Theme: the inline script in __root.tsx applied the class pre-paint; mirror the DOM here.
+  // SSR renders "light" — a benign hydration mismatch on the toggle is possible for dark users.
+  const [theme, setTheme] = useState<"light" | "dark">(() =>
+    typeof document === "undefined"
+      ? "light"
+      : document.documentElement.classList.contains("dark")
+        ? "dark"
+        : "light",
+  );
   function setMode(t: "light" | "dark") {
     setTheme(t);
     document.documentElement.classList.toggle("dark", t === "dark");
@@ -297,7 +308,8 @@ function ProjectLayout() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Range segmented control */}
+            {/* Range segmented control — presets bucket by UTC day */}
+            <span className="eyebrow">Range · UTC</span>
             <div className="flex items-center border-2 border-border bg-muted">
               {RANGES.map((p) => (
                 <button

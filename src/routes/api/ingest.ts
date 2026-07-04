@@ -15,6 +15,9 @@ import {
   MAX_BODY_BYTES,
 } from "~/server/ingest";
 import { computeVisitorHash, extractClientIp } from "~/server/visitor";
+import { rateLimitOk } from "~/server/rate-limit";
+// Side-effect import: starts opt-in retention pruning at server boot.
+import "~/server/retention";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -37,6 +40,21 @@ export const Route = createFileRoute("/api/ingest")({
             status: 405,
             headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
           });
+        }
+
+        // Extract client IP — needed for rate limiting before body parsing.
+        const xForwardedFor = request.headers.get("x-forwarded-for");
+        // TanStack Start / Vinxi exposes the socket address via a non-standard
+        // header set by the server adapter; fall back to a placeholder when
+        // running behind a proxy that always sets X-Forwarded-For.
+        const socketAddress =
+          request.headers.get("x-real-ip") ??
+          request.headers.get("cf-connecting-ip") ??
+          "unknown";
+        const clientIp = extractClientIp(xForwardedFor, socketAddress);
+
+        if (!rateLimitOk(clientIp)) {
+          return new Response(null, { status: 429, headers: CORS_HEADERS });
         }
 
         // Reject oversized bodies before buffering — avoids memory DoS.
@@ -77,17 +95,6 @@ export const Route = createFileRoute("/api/ingest")({
           return new Response(null, { status: 202, headers: CORS_HEADERS });
         }
 
-        // Extract client IP
-        const xForwardedFor = request.headers.get("x-forwarded-for");
-        // TanStack Start / Vinxi exposes the socket address via a non-standard
-        // header set by the server adapter; fall back to a placeholder when
-        // running behind a proxy that always sets X-Forwarded-For.
-        const socketAddress =
-          request.headers.get("x-real-ip") ??
-          request.headers.get("cf-connecting-ip") ??
-          "unknown";
-        const clientIp = extractClientIp(xForwardedFor, socketAddress);
-
         const now = new Date();
 
         const visitorHash = await computeVisitorHash(
@@ -97,7 +104,7 @@ export const Route = createFileRoute("/api/ingest")({
           now,
         );
 
-        await persistEvent({ projectId: project.id, visitorHash, payload, now });
+        await persistEvent({ projectId: project.id, visitorHash, payload, now, userAgent });
 
         return new Response(null, { status: 202, headers: CORS_HEADERS });
       },

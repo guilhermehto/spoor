@@ -13,6 +13,7 @@ import {
   queryTimeSeries,
   queryUniqueVisitors,
   queryErrorCount,
+  queryErrorGroups,
   queryTopPages,
   queryTopReferrers,
   queryEventCounts,
@@ -21,7 +22,12 @@ import {
   queryPageviewTotal,
   querySessionCount,
   queryAvgSessionDuration,
+  queryBounceRate,
+  queryActiveVisitors,
+  queryHasAnyEvents,
   queryEventPropBreakdown,
+  queryDeviceBreakdown,
+  queryUtmBreakdown,
   type DateRange,
   type TimeSeriesBucket,
   type SessionSummary,
@@ -74,11 +80,15 @@ export interface OverviewData {
     uniqueVisitors: number;
     sessions: number;
     avgSessionSeconds: number;
+    /** Percentage (0-100) of sessions with exactly one pageview. */
+    bounceRate: number;
+    /** Percent change vs. the previous window; null when there is no baseline (prev = 0). */
     deltas: {
-      pageViews: number;
-      uniqueVisitors: number;
-      sessions: number;
-      avgSessionSeconds: number;
+      pageViews: number | null;
+      uniqueVisitors: number | null;
+      sessions: number | null;
+      avgSessionSeconds: number | null;
+      bounceRate: number | null;
     };
   };
 }
@@ -121,10 +131,12 @@ export const getOverviewFn = createServerFn({ method: "GET" })
       pageViews,
       sessions,
       avgSessionSeconds,
+      bounceRate,
       prevPageViews,
       prevVisitors,
       prevSessions,
       prevAvg,
+      prevBounce,
     ] = await Promise.all([
       queryTimeSeries(db, data.projectId, range, filters),
       queryUniqueVisitors(db, data.projectId, range, filters),
@@ -135,10 +147,12 @@ export const getOverviewFn = createServerFn({ method: "GET" })
       queryPageviewTotal(db, data.projectId, range, filters),
       querySessionCount(db, data.projectId, range),
       queryAvgSessionDuration(db, data.projectId, range),
+      queryBounceRate(db, data.projectId, range),
       queryPageviewTotal(db, data.projectId, prevRange, filters),
       queryUniqueVisitors(db, data.projectId, prevRange, filters),
       querySessionCount(db, data.projectId, prevRange),
       queryAvgSessionDuration(db, data.projectId, prevRange),
+      queryBounceRate(db, data.projectId, prevRange),
     ]);
 
     const topPages: RankedPage = {
@@ -169,19 +183,21 @@ export const getOverviewFn = createServerFn({ method: "GET" })
       hasMore: rawEvents.length > RANKED_PAGE_SIZE,
     };
 
-    const deltaPct = (cur: number, prev: number): number =>
-      prev > 0 ? Math.round(((cur - prev) / prev) * 100) : 0;
+    const deltaPct = (cur: number, prev: number): number | null =>
+      prev > 0 ? Math.round(((cur - prev) / prev) * 100) : null;
 
     const metrics: OverviewData["metrics"] = {
       pageViews,
       uniqueVisitors,
       sessions,
       avgSessionSeconds,
+      bounceRate,
       deltas: {
         pageViews: deltaPct(pageViews, prevPageViews),
         uniqueVisitors: deltaPct(uniqueVisitors, prevVisitors),
         sessions: deltaPct(sessions, prevSessions),
         avgSessionSeconds: deltaPct(avgSessionSeconds, prevAvg),
+        bounceRate: deltaPct(bounceRate, prevBounce),
       },
     };
 
@@ -194,6 +210,64 @@ export const getOverviewFn = createServerFn({ method: "GET" })
       eventCounts,
       metrics,
     };
+  });
+
+// ── Live active visitors ──────────────────────────────────────────────────────
+
+export const getActiveNowFn = createServerFn({ method: "GET" })
+  .validator((data: { projectId: string }) => data)
+  .handler(async ({ data }): Promise<number> => {
+    const session = await requireSession();
+    await requireOwnedProject(db, data.projectId, session.user.id);
+    return queryActiveVisitors(db, data.projectId);
+  });
+
+// ── Any-event existence check ─────────────────────────────────────────────────
+
+export const getHasEventsFn = createServerFn({ method: "GET" })
+  .validator((data: { projectId: string }) => data)
+  .handler(async ({ data }): Promise<boolean> => {
+    const session = await requireSession();
+    await requireOwnedProject(db, data.projectId, session.user.id);
+    return queryHasAnyEvents(db, data.projectId);
+  });
+
+// ── Device / browser / OS breakdown ───────────────────────────────────────────
+
+export interface DeviceBreakdownData {
+  browsers: RankedRow[];
+  os: RankedRow[];
+  devices: RankedRow[];
+}
+
+export const getDeviceBreakdownFn = createServerFn({ method: "GET" })
+  .validator((data: { projectId: string; from: string; to: string }) => data)
+  .handler(async ({ data }): Promise<DeviceBreakdownData> => {
+    const session = await requireSession();
+    await requireOwnedProject(db, data.projectId, session.user.id);
+    return queryDeviceBreakdown(db, data.projectId, {
+      from: new Date(data.from),
+      to: new Date(data.to),
+    });
+  });
+
+// ── UTM / campaign breakdown ──────────────────────────────────────────────────
+
+export interface UtmBreakdownData {
+  sources: RankedRow[];
+  mediums: RankedRow[];
+  campaigns: RankedRow[];
+}
+
+export const getUtmBreakdownFn = createServerFn({ method: "GET" })
+  .validator((data: { projectId: string; from: string; to: string }) => data)
+  .handler(async ({ data }): Promise<UtmBreakdownData> => {
+    const session = await requireSession();
+    await requireOwnedProject(db, data.projectId, session.user.id);
+    return queryUtmBreakdown(db, data.projectId, {
+      from: new Date(data.from),
+      to: new Date(data.to),
+    });
   });
 
 // ── Paginated ranked list ─────────────────────────────────────────────────────
@@ -407,4 +481,53 @@ export const getEventBreakdownFn = createServerFn({ method: "GET" })
     await requireOwnedProject(db, data.projectId, session.user.id);
     const range: DateRange = { from: new Date(data.from), to: new Date(data.to) };
     return queryEventPropBreakdown(db, data.projectId, range, data.name);
+  });
+
+// ── Error groups ──────────────────────────────────────────────────────────────
+
+export interface ErrorGroupRow {
+  name: string;
+  count: number;
+  /** ISO timestamp of the most recent occurrence. */
+  lastSeen: string;
+  samplePath: string;
+  sampleProps: JsonValue | null;
+}
+
+export interface ErrorGroupsData {
+  /** Total error events in range (not capped by grouping). */
+  total: number;
+  /** Groups ranked by count desc, cap 50. */
+  groups: ErrorGroupRow[];
+}
+
+interface ErrorGroupsInput {
+  projectId: string;
+  from: string;
+  to: string;
+}
+
+export const getErrorGroupsFn = createServerFn({ method: "GET" })
+  .validator((data: ErrorGroupsInput) => data)
+  .handler(async ({ data }): Promise<ErrorGroupsData> => {
+    const session = await requireSession();
+    await requireOwnedProject(db, data.projectId, session.user.id);
+
+    const range: DateRange = { from: new Date(data.from), to: new Date(data.to) };
+
+    const [total, groups] = await Promise.all([
+      queryErrorCount(db, data.projectId, range),
+      queryErrorGroups(db, data.projectId, range),
+    ]);
+
+    return {
+      total,
+      groups: groups.map((g) => ({
+        name: g.name,
+        count: g.count,
+        lastSeen: g.lastSeen.toISOString(),
+        samplePath: g.samplePath,
+        sampleProps: g.sampleProps,
+      })),
+    };
   });

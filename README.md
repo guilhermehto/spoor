@@ -43,6 +43,7 @@ The seed (`pnpm db:seed`) is **development-only** — it refuses to run when `NO
 | `SPOOR_HASH_SECRET` | yes | Secret for daily visitor-hash salt. Generate: `openssl rand -base64 32`. Rotating this invalidates historical hashes. |
 | `POSTGRES_PASSWORD` | compose only | Postgres password used by `docker-compose.yml`. Not needed when `DATABASE_URL` is set directly. |
 | `PORT` | no | Port the app listens on (default: `3000`) |
+| `SPOOR_RETENTION_DAYS` | no | Delete analytics data older than N days; unset = keep forever |
 
 ## Production deploy with Docker Compose
 

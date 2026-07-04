@@ -18,6 +18,7 @@ function DashboardIndex() {
   const [name, setName] = useState("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const navigate = useNavigate();
   const { data: session } = useSession();
 
@@ -42,12 +43,14 @@ function DashboardIndex() {
   }
 
   async function handleDelete(projectId: string) {
-    if (!confirm("Delete this project and all its data?")) return;
+    setError(null);
     try {
       await deleteProjectFn({ data: { projectId } });
       await router.invalidate();
-    } catch {
-      alert("Failed to delete project");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete project");
+    } finally {
+      setConfirmingId(null);
     }
   }
 
@@ -120,33 +123,56 @@ function DashboardIndex() {
                     {project.publicKey}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="default" size="sm" asChild>
-                    <Link
-                      to="/dashboard/$projectId"
-                      params={{ projectId: project.id }}
-                      search={{ from: undefined, to: undefined }}
+                {confirmingId === project.id ? (
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm text-destructive">
+                      Delete “{project.name}” and all its analytics data? This
+                      cannot be undone.
+                    </p>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleDelete(project.id)}
                     >
-                      Overview
-                    </Link>
-                  </Button>
-                  <Button variant="outline" size="sm" asChild>
-                    <Link
-                      to="/dashboard/$projectId/setup"
-                      params={{ projectId: project.id }}
-                      search={{ from: undefined, to: undefined }}
+                      Delete
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setConfirmingId(null)}
                     >
-                      Setup
-                    </Link>
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => handleDelete(project.id)}
-                  >
-                    Delete
-                  </Button>
-                </div>
+                      Cancel
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Button variant="default" size="sm" asChild>
+                      <Link
+                        to="/dashboard/$projectId"
+                        params={{ projectId: project.id }}
+                        search={{ from: undefined, to: undefined }}
+                      >
+                        Overview
+                      </Link>
+                    </Button>
+                    <Button variant="outline" size="sm" asChild>
+                      <Link
+                        to="/dashboard/$projectId/setup"
+                        params={{ projectId: project.id }}
+                        search={{ from: undefined, to: undefined }}
+                      >
+                        Setup
+                      </Link>
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setConfirmingId(project.id)}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}

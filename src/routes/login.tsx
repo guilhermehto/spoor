@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { signIn } from "~/lib/auth-client";
 import { DEV_ACCOUNT } from "~/lib/dev-account";
+import { signupOpenFn } from "~/server/signup-status";
 import { Button } from "~/components/ui/button";
 
 // Pre-fill the seeded dev account in development only. import.meta.env.DEV is a
@@ -10,10 +11,12 @@ import { Button } from "~/components/ui/button";
 const IS_DEV = Boolean((import.meta as any).env?.DEV);
 
 export const Route = createFileRoute("/login")({
+  loader: () => signupOpenFn(),
   component: LoginPage,
 });
 
 function LoginPage() {
+  const { open } = Route.useLoaderData();
   const navigate = useNavigate();
   const [email, setEmail] = useState(IS_DEV ? DEV_ACCOUNT.email : "");
   const [password, setPassword] = useState(IS_DEV ? DEV_ACCOUNT.password : "");
@@ -95,12 +98,14 @@ function LoginPage() {
             {loading ? "Signing in…" : "Sign in"}
           </Button>
         </form>
-        <p className="text-center text-sm text-muted-foreground">
-          No account?{" "}
-          <Link to="/register" className="underline hover:text-foreground">
-            Register
-          </Link>
-        </p>
+        {open && (
+          <p className="text-center text-sm text-muted-foreground">
+            No account?{" "}
+            <Link to="/register" className="underline hover:text-foreground">
+              Register
+            </Link>
+          </p>
+        )}
       </div>
     </main>
   );

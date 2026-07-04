@@ -12,7 +12,7 @@
  * analytics_events.  Queries that need unique visitors JOIN through the session.
  */
 
-import { eq, and, gte, lte, ne, sql, desc, asc, count, countDistinct } from "drizzle-orm";
+import { eq, and, gt, gte, lte, ne, sql, desc, asc, count, countDistinct, inArray, isNotNull } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import type * as schema from "~/db/schema";
 import { analyticsEvents, analyticsSessions, projects } from "~/db/schema";
@@ -117,6 +117,84 @@ export async function queryErrorCount(
   return Number(row?.total ?? 0);
 }
 
+// ── Error groups ──────────────────────────────────────────────────────────────
+
+export interface ErrorGroup {
+  name: string;
+  count: number;
+  lastSeen: Date;
+  samplePath: string;
+  sampleProps: JsonValue | null;
+}
+
+/**
+ * Returns error events (t = "error") within [from, to] grouped by message
+ * (`name`), ranked by count desc (cap `limit`, default 50), each with the
+ * newest event's path/props as a representative sample.
+ */
+export async function queryErrorGroups(
+  db: DB,
+  projectId: string,
+  range: DateRange,
+  opts: { limit?: number } = {},
+): Promise<ErrorGroup[]> {
+  const limit = opts.limit ?? 50;
+  const errorScope = and(
+    eq(analyticsEvents.projectId, projectId),
+    eq(analyticsEvents.type, "error"),
+    gte(analyticsEvents.createdAt, range.from),
+    lte(analyticsEvents.createdAt, range.to),
+  );
+
+  const groups = await db
+    .select({
+      name: analyticsEvents.name,
+      total: count(analyticsEvents.id).as("total"),
+      lastSeen: sql<Date>`max(${analyticsEvents.createdAt})`
+        .mapWith(analyticsEvents.createdAt)
+        .as("last_seen"),
+    })
+    .from(analyticsEvents)
+    .where(errorScope)
+    .groupBy(analyticsEvents.name)
+    .orderBy(desc(count(analyticsEvents.id)), asc(analyticsEvents.name))
+    .limit(limit);
+
+  if (groups.length === 0) return [];
+
+  // ponytail: second DISTINCT ON query for the newest sample per group —
+  // simpler than a lateral join and fine at ≤50 groups.
+  const samples = await db
+    .selectDistinctOn([analyticsEvents.name], {
+      name: analyticsEvents.name,
+      path: analyticsEvents.path,
+      props: analyticsEvents.props,
+    })
+    .from(analyticsEvents)
+    .where(
+      and(
+        errorScope,
+        inArray(
+          analyticsEvents.name,
+          groups.map((g) => g.name),
+        ),
+      ),
+    )
+    .orderBy(asc(analyticsEvents.name), desc(analyticsEvents.createdAt));
+
+  const sampleByName = new Map(samples.map((s) => [s.name, s]));
+  return groups.map((g) => {
+    const sample = sampleByName.get(g.name);
+    return {
+      name: g.name,
+      count: Number(g.total),
+      lastSeen: g.lastSeen,
+      samplePath: sample?.path ?? "",
+      sampleProps: (sample?.props ?? null) as JsonValue | null,
+    };
+  });
+}
+
 // ── Range-wide pageview total ─────────────────────────────────────────────────
 
 /**
@@ -198,6 +276,72 @@ export async function queryAvgSessionDuration(
       ),
     );
   return Math.round(Number(row?.avgSeconds ?? 0));
+}
+
+// ── Bounce rate ───────────────────────────────────────────────────────────────
+
+/**
+ * Returns the percentage (0-100, rounded) of sessions started within
+ * [from, to] that recorded exactly one pageview event.  Returns 0 when the
+ * range contains no sessions.
+ */
+export async function queryBounceRate(
+  db: DB,
+  projectId: string,
+  range: DateRange,
+): Promise<number> {
+  // ponytail: correlated subquery per session — fine at self-hosted volumes,
+  // switch to a LEFT JOIN + GROUP BY if it shows up in slow-query logs.
+  const [row] = await db
+    .select({
+      pct: sql<number | null>`round(avg(case when (select count(*) from ${analyticsEvents} where ${analyticsEvents.sessionId} = ${analyticsSessions.id} and ${analyticsEvents.type} = 'pageview') = 1 then 100.0 else 0 end))`.as(
+        "pct",
+      ),
+    })
+    .from(analyticsSessions)
+    .where(
+      and(
+        eq(analyticsSessions.projectId, projectId),
+        gte(analyticsSessions.startedAt, range.from),
+        lte(analyticsSessions.startedAt, range.to),
+      ),
+    );
+  return Number(row?.pct ?? 0);
+}
+
+// ── Live active visitors ──────────────────────────────────────────────────────
+
+/**
+ * Returns the count of distinct visitors seen in the last 5 minutes.
+ */
+export async function queryActiveVisitors(db: DB, projectId: string): Promise<number> {
+  const [row] = await db
+    .select({
+      active: countDistinct(analyticsSessions.visitorHash).as("active"),
+    })
+    .from(analyticsSessions)
+    .where(
+      and(
+        eq(analyticsSessions.projectId, projectId),
+        gt(analyticsSessions.lastSeenAt, sql`now() - interval '5 minutes'`),
+      ),
+    );
+  return Number(row?.active ?? 0);
+}
+
+// ── Any-event existence check ─────────────────────────────────────────────────
+
+/**
+ * Returns whether the project has recorded at least one event, ever.
+ * Powers the first-event onboarding callout.
+ */
+export async function queryHasAnyEvents(db: DB, projectId: string): Promise<boolean> {
+  const rows = await db
+    .select({ one: sql<number>`1` })
+    .from(analyticsEvents)
+    .where(eq(analyticsEvents.projectId, projectId))
+    .limit(1);
+  return rows.length > 0;
 }
 
 // ── Time-series: pageviews + unique visitors per bucket ───────────────────────
@@ -651,4 +795,105 @@ export async function querySessionTimeline(
     props: r.props as { [key: string]: JsonValue } | null,
     offsetMs: r.createdAt.getTime() - sessionStart.getTime(),
   }));
+}
+
+// ── Device / browser / OS breakdown ───────────────────────────────────────────
+
+export interface DeviceBreakdown {
+  browsers: Array<{ label: string; count: number }>;
+  os: Array<{ label: string; count: number }>;
+  devices: Array<{ label: string; count: number }>;
+}
+
+/**
+ * Returns browser / OS / device family counts over sessions started within
+ * [from, to], each ranked by count desc (top 10).  Sessions created before the
+ * ua columns existed have NULLs and are excluded.
+ */
+export async function queryDeviceBreakdown(
+  db: DB,
+  projectId: string,
+  range: DateRange,
+): Promise<DeviceBreakdown> {
+  type UaCol =
+    | typeof analyticsSessions.browser
+    | typeof analyticsSessions.os
+    | typeof analyticsSessions.device;
+  const top = (col: UaCol) =>
+    db
+      .select({ label: col, count: count(analyticsSessions.id).as("count") })
+      .from(analyticsSessions)
+      .where(
+        and(
+          eq(analyticsSessions.projectId, projectId),
+          gte(analyticsSessions.startedAt, range.from),
+          lte(analyticsSessions.startedAt, range.to),
+          isNotNull(col),
+        ),
+      )
+      .groupBy(col)
+      .orderBy(desc(count(analyticsSessions.id)), asc(col))
+      .limit(10);
+
+  const [browsers, os, devices] = await Promise.all([
+    top(analyticsSessions.browser),
+    top(analyticsSessions.os),
+    top(analyticsSessions.device),
+  ]);
+
+  const clean = (rows: Array<{ label: string | null; count: number }>) =>
+    rows.map((r) => ({ label: r.label ?? "", count: Number(r.count) }));
+
+  return { browsers: clean(browsers), os: clean(os), devices: clean(devices) };
+}
+
+// ── UTM / campaign breakdown ──────────────────────────────────────────────────
+
+export interface UtmBreakdown {
+  sources: Array<{ label: string; count: number }>;
+  mediums: Array<{ label: string; count: number }>;
+  campaigns: Array<{ label: string; count: number }>;
+}
+
+/**
+ * Returns utm_source / utm_medium / utm_campaign counts over pageview events
+ * within [from, to], each ranked by count desc (top 10).  Events without the
+ * respective param are NULL and excluded.
+ */
+export async function queryUtmBreakdown(
+  db: DB,
+  projectId: string,
+  range: DateRange,
+): Promise<UtmBreakdown> {
+  type UtmCol =
+    | typeof analyticsEvents.utmSource
+    | typeof analyticsEvents.utmMedium
+    | typeof analyticsEvents.utmCampaign;
+  const top = (col: UtmCol) =>
+    db
+      .select({ label: col, count: count(analyticsEvents.id).as("count") })
+      .from(analyticsEvents)
+      .where(
+        and(
+          eq(analyticsEvents.projectId, projectId),
+          eq(analyticsEvents.type, "pageview"),
+          gte(analyticsEvents.createdAt, range.from),
+          lte(analyticsEvents.createdAt, range.to),
+          isNotNull(col),
+        ),
+      )
+      .groupBy(col)
+      .orderBy(desc(count(analyticsEvents.id)), asc(col))
+      .limit(10);
+
+  const [sources, mediums, campaigns] = await Promise.all([
+    top(analyticsEvents.utmSource),
+    top(analyticsEvents.utmMedium),
+    top(analyticsEvents.utmCampaign),
+  ]);
+
+  const clean = (rows: Array<{ label: string | null; count: number }>) =>
+    rows.map((r) => ({ label: r.label ?? "", count: Number(r.count) }));
+
+  return { sources: clean(sources), mediums: clean(mediums), campaigns: clean(campaigns) };
 }

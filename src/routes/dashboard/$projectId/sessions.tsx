@@ -27,6 +27,7 @@ import { Button } from "~/components/ui/button";
 // ── Route ─────────────────────────────────────────────────────────────────────
 
 export const Route = createFileRoute("/dashboard/$projectId/sessions")({
+  head: () => ({ meta: [{ title: "Sessions · Spoor" }] }),
   loaderDeps: ({
     search,
   }: {
@@ -214,7 +215,7 @@ function SessionsList({ projectId, from, to, initialSessions, initialHasMore }: 
 
   return (
     <div className="flex flex-col gap-[18px]">
-      <header className="flex items-baseline justify-between gap-4">
+      <header className="flex items-center justify-between gap-4">
         <h2 className="text-sm text-foreground">
           <span className="font-bold tabular-nums">
             {sessions.length}
@@ -223,9 +224,18 @@ function SessionsList({ projectId, from, to, initialSessions, initialHasMore }: 
           sessions ·{" "}
           <span className="text-muted-foreground">{rangeLabel(from, to)}</span>
         </h2>
-        <p className="shrink-0 text-xs text-muted-foreground">
-          Click a row to expand the visitor’s journey
-        </p>
+        <div className="flex shrink-0 items-center gap-3">
+          <p className="hidden text-xs text-muted-foreground sm:block">
+            Click a row to expand the visitor’s journey
+          </p>
+          <Button asChild variant="outline" size="sm">
+            <a
+              href={`/api/export?${new URLSearchParams({ projectId, kind: "sessions", from, to })}`}
+            >
+              Export CSV
+            </a>
+          </Button>
+        </div>
       </header>
 
       {sessions.length === 0 ? (

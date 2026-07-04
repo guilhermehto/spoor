@@ -78,6 +78,11 @@ export const analyticsSessions = pgTable(
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull(),
     entryPath: text("entry_path").notNull(),
     referrer: text("referrer").notNull().default(""),
+    // Coarse UA families parsed at ingest (src/server/ua.ts); raw UA is never stored.
+    // Nullable — sessions created before this migration have no data.
+    browser: text("browser"),
+    os: text("os"),
+    device: text("device"),
   },
   (table) => [
     foreignKey({
@@ -103,6 +108,11 @@ export const analyticsEvents = pgTable(
     path: text("path").notNull(),
     host: text("host").notNull(),
     referrer: text("referrer").notNull().default(""),
+    // UTM params extracted from the raw snippet path at ingest (src/server/ingest.ts).
+    // Nullable — events without campaign params (or predating this migration's backfill).
+    utmSource: text("utm_source"),
+    utmMedium: text("utm_medium"),
+    utmCampaign: text("utm_campaign"),
     props: jsonb("props"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },

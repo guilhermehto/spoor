@@ -17,11 +17,13 @@ import { Route as DashboardRouteRouteImport } from './routes/dashboard/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard/index'
 import { Route as ApiIngestRouteImport } from './routes/api/ingest'
+import { Route as ApiExportRouteImport } from './routes/api/export'
 import { Route as DashboardProjectIdRouteRouteImport } from './routes/dashboard/$projectId/route'
 import { Route as DashboardProjectIdIndexRouteImport } from './routes/dashboard/$projectId/index'
 import { Route as DashboardProjectIdSetupRouteImport } from './routes/dashboard/$projectId/setup'
 import { Route as DashboardProjectIdSessionsRouteImport } from './routes/dashboard/$projectId/sessions'
 import { Route as DashboardProjectIdEventsRouteImport } from './routes/dashboard/$projectId/events'
+import { Route as DashboardProjectIdErrorsRouteImport } from './routes/dashboard/$projectId/errors'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
 const RegisterRoute = RegisterRouteImport.update({
@@ -64,6 +66,11 @@ const ApiIngestRoute = ApiIngestRouteImport.update({
   path: '/api/ingest',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiExportRoute = ApiExportRouteImport.update({
+  id: '/api/export',
+  path: '/api/export',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardProjectIdRouteRoute = DashboardProjectIdRouteRouteImport.update({
   id: '/$projectId',
   path: '/$projectId',
@@ -91,6 +98,12 @@ const DashboardProjectIdEventsRoute =
     path: '/events',
     getParentRoute: () => DashboardProjectIdRouteRoute,
   } as any)
+const DashboardProjectIdErrorsRoute =
+  DashboardProjectIdErrorsRouteImport.update({
+    id: '/errors',
+    path: '/errors',
+    getParentRoute: () => DashboardProjectIdRouteRoute,
+  } as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -105,9 +118,11 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/dashboard/$projectId': typeof DashboardProjectIdRouteRouteWithChildren
+  '/api/export': typeof ApiExportRoute
   '/api/ingest': typeof ApiIngestRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/dashboard/$projectId/errors': typeof DashboardProjectIdErrorsRoute
   '/dashboard/$projectId/events': typeof DashboardProjectIdEventsRoute
   '/dashboard/$projectId/sessions': typeof DashboardProjectIdSessionsRoute
   '/dashboard/$projectId/setup': typeof DashboardProjectIdSetupRoute
@@ -119,9 +134,11 @@ export interface FileRoutesByTo {
   '/demo-landing': typeof DemoLandingRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
+  '/api/export': typeof ApiExportRoute
   '/api/ingest': typeof ApiIngestRoute
   '/dashboard': typeof DashboardIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/dashboard/$projectId/errors': typeof DashboardProjectIdErrorsRoute
   '/dashboard/$projectId/events': typeof DashboardProjectIdEventsRoute
   '/dashboard/$projectId/sessions': typeof DashboardProjectIdSessionsRoute
   '/dashboard/$projectId/setup': typeof DashboardProjectIdSetupRoute
@@ -136,9 +153,11 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/dashboard/$projectId': typeof DashboardProjectIdRouteRouteWithChildren
+  '/api/export': typeof ApiExportRoute
   '/api/ingest': typeof ApiIngestRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/dashboard/$projectId/errors': typeof DashboardProjectIdErrorsRoute
   '/dashboard/$projectId/events': typeof DashboardProjectIdEventsRoute
   '/dashboard/$projectId/sessions': typeof DashboardProjectIdSessionsRoute
   '/dashboard/$projectId/setup': typeof DashboardProjectIdSetupRoute
@@ -154,9 +173,11 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/dashboard/$projectId'
+    | '/api/export'
     | '/api/ingest'
     | '/dashboard/'
     | '/api/auth/$'
+    | '/dashboard/$projectId/errors'
     | '/dashboard/$projectId/events'
     | '/dashboard/$projectId/sessions'
     | '/dashboard/$projectId/setup'
@@ -168,9 +189,11 @@ export interface FileRouteTypes {
     | '/demo-landing'
     | '/login'
     | '/register'
+    | '/api/export'
     | '/api/ingest'
     | '/dashboard'
     | '/api/auth/$'
+    | '/dashboard/$projectId/errors'
     | '/dashboard/$projectId/events'
     | '/dashboard/$projectId/sessions'
     | '/dashboard/$projectId/setup'
@@ -184,9 +207,11 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/dashboard/$projectId'
+    | '/api/export'
     | '/api/ingest'
     | '/dashboard/'
     | '/api/auth/$'
+    | '/dashboard/$projectId/errors'
     | '/dashboard/$projectId/events'
     | '/dashboard/$projectId/sessions'
     | '/dashboard/$projectId/setup'
@@ -200,6 +225,7 @@ export interface RootRouteChildren {
   DemoLandingRoute: typeof DemoLandingRoute
   LoginRoute: typeof LoginRoute
   RegisterRoute: typeof RegisterRoute
+  ApiExportRoute: typeof ApiExportRoute
   ApiIngestRoute: typeof ApiIngestRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
@@ -262,6 +288,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiIngestRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/export': {
+      id: '/api/export'
+      path: '/api/export'
+      fullPath: '/api/export'
+      preLoaderRoute: typeof ApiExportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard/$projectId': {
       id: '/dashboard/$projectId'
       path: '/$projectId'
@@ -297,6 +330,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardProjectIdEventsRouteImport
       parentRoute: typeof DashboardProjectIdRouteRoute
     }
+    '/dashboard/$projectId/errors': {
+      id: '/dashboard/$projectId/errors'
+      path: '/errors'
+      fullPath: '/dashboard/$projectId/errors'
+      preLoaderRoute: typeof DashboardProjectIdErrorsRouteImport
+      parentRoute: typeof DashboardProjectIdRouteRoute
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -308,6 +348,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface DashboardProjectIdRouteRouteChildren {
+  DashboardProjectIdErrorsRoute: typeof DashboardProjectIdErrorsRoute
   DashboardProjectIdEventsRoute: typeof DashboardProjectIdEventsRoute
   DashboardProjectIdSessionsRoute: typeof DashboardProjectIdSessionsRoute
   DashboardProjectIdSetupRoute: typeof DashboardProjectIdSetupRoute
@@ -316,6 +357,7 @@ interface DashboardProjectIdRouteRouteChildren {
 
 const DashboardProjectIdRouteRouteChildren: DashboardProjectIdRouteRouteChildren =
   {
+    DashboardProjectIdErrorsRoute: DashboardProjectIdErrorsRoute,
     DashboardProjectIdEventsRoute: DashboardProjectIdEventsRoute,
     DashboardProjectIdSessionsRoute: DashboardProjectIdSessionsRoute,
     DashboardProjectIdSetupRoute: DashboardProjectIdSetupRoute,
@@ -348,6 +390,7 @@ const rootRouteChildren: RootRouteChildren = {
   DemoLandingRoute: DemoLandingRoute,
   LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,
+  ApiExportRoute: ApiExportRoute,
   ApiIngestRoute: ApiIngestRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }

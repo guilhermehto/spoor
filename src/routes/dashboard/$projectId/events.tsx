@@ -18,10 +18,12 @@ import {
   type EventBreakdown,
 } from "~/server/analytics-fns";
 import { buildRange } from "~/components/analytics/range-picker";
+import { Button } from "~/components/ui/button";
 
 // ── Route ─────────────────────────────────────────────────────────────────────
 
 export const Route = createFileRoute("/dashboard/$projectId/events")({
+  head: () => ({ meta: [{ title: "Events · Spoor" }] }),
   loaderDeps: ({
     search,
   }: {
@@ -237,7 +239,16 @@ function EventsTable({
     <div className="bg-card border-2 border-border">
       <div className="flex items-center justify-between border-b-2 border-border px-4 py-3">
         <span className="eyebrow">All events</span>
-        <span className="text-xs text-muted-foreground">Ranked by fires</span>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-muted-foreground">Ranked by fires</span>
+          <Button asChild variant="outline" size="sm">
+            <a
+              href={`/api/export?${new URLSearchParams({ projectId, kind: "events", from, to })}`}
+            >
+              Export CSV
+            </a>
+          </Button>
+        </div>
       </div>
       {rows.length === 0 ? (
         <p className="px-4 py-4 text-sm text-muted-foreground">

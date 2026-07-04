@@ -1,13 +1,16 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { signUp } from "~/lib/auth-client";
+import { signupOpenFn } from "~/server/signup-status";
 import { Button } from "~/components/ui/button";
 
 export const Route = createFileRoute("/register")({
+  loader: () => signupOpenFn(),
   component: RegisterPage,
 });
 
 function RegisterPage() {
+  const { open } = Route.useLoaderData();
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -36,6 +39,28 @@ function RegisterPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  // Race case (user registers between loader and submit) is still handled by
+  // the signup_disabled branch in handleSubmit above.
+  if (!open) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center bg-background p-8">
+        <div className="w-full max-w-sm space-y-6 text-center">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            Registration is closed
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            An admin account already exists.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            <Link to="/login" className="underline hover:text-foreground">
+              Sign in
+            </Link>
+          </p>
+        </div>
+      </main>
+    );
   }
 
   return (
