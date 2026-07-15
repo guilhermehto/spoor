@@ -35,7 +35,7 @@ A capture-phase click listener walks up from the click target and sends a click 
 
 ## Custom events
 
-The snippet exposes exactly one global, `window.spoor`, with a single method:
+The snippet exposes one global, `window.spoor`. Its main method is `track`:
 
 ```js
 window.spoor.track(name, props);
@@ -53,7 +53,25 @@ Behavior:
 | `name` | Required. Falsy name → the call is a no-op. Coerced with `String()`. |
 | `props` | Optional. Attached only if it is a plain object — arrays and non-objects are dropped. |
 
-The event also carries the current path (`pathname + search + hash`) and hostname. There is nothing else on `window.spoor`.
+The event also carries the current path (`pathname + search + hash`) and hostname.
+
+## Global properties
+
+`identify` attaches properties to every event the snippet sends from then on: pageviews, clicks, custom events, and errors. Call it once you know who the visitor is, for example after login:
+
+```js
+window.spoor.identify({ tenant_id: 'acme', user_id: 'u_123' });
+```
+
+- Globals are merged into each event's props. Per-call `track` props win on key collisions, so `track('signup', { tenant_id: 'other' })` overrides the global `tenant_id` for that one event.
+- Calling `identify` again merges on top by key; it does not clear keys you set earlier.
+- `clearIdentify()` drops all globals. Call it on logout.
+
+```js
+window.spoor.clearIdentify();
+```
+
+This is how you segment usage by tenant or user in the dashboard. See [Property breakdown](/guide/dashboard#events). Values are stored verbatim in the analytics database, so send stable ids (tenant/user), not raw PII like emails or names.
 
 ## Error tracking
 

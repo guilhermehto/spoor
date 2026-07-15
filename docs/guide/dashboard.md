@@ -32,7 +32,7 @@ The header shows your account email and a sign-out button.
 
 - **Summary cards** — Events fired (and how many distinct types), Click events, Custom events (each with their share of all fires), and Event types.
 - **All events table** — one row per event name, ranked by fire count. Each row shows rank, a `click`/`custom` type badge, the event name (click events also show their trigger selector), a share bar, the count, and its percentage of all fires.
-- **Property breakdown** — custom-event rows expand on click to show the distribution of their top property's values (loaded lazily, cached per event). Click rows don't expand.
+- **Property breakdown** — custom-event rows expand on click. Pick any property key (for example `tenant_id`) to see the exact number of events per value; click a value to drill in, then switch the key (for example to `user_id`) to segment within it. Active filters show as removable chips. Loaded lazily and cached; the top 50 values per key are shown. Click rows don't expand.
 - **Export CSV** — button in the table header; see [CSV export](#csv-export).
 
 ## Errors
