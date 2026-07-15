@@ -4,20 +4,23 @@
  * URL: /dashboard/$projectId/events
  *
  * Reads `from`/`to` from the shared parent search params (set by the topbar
- * range control).  Custom-event rows expand to lazily load + cache their
- * top-property distribution; click rows have no trigger and no caret.
+ * range control).  Custom-event rows expand to a chooseable-key property
+ * breakdown with drill-down; click rows have no trigger and no caret.
  */
 
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   getEventsFn,
   getEventBreakdownFn,
+  getEventPropKeysFn,
   type EventsData,
   type EventsRow,
-  type EventBreakdown,
+  type EventPropBreakdown,
+  type RankedRow,
 } from "~/server/analytics-fns";
 import { buildRange } from "~/components/analytics/range-picker";
+import { RankedList } from "~/components/analytics/ranked-list";
 import { Button } from "~/components/ui/button";
 
 // ── Route ─────────────────────────────────────────────────────────────────────
@@ -89,8 +92,9 @@ interface EventRowProps {
   rank: number;
   maxCount: number;
   expanded: boolean;
-  breakdown: EventBreakdown | null | undefined; // undefined = not loaded, null = no data
-  loading: boolean;
+  projectId: string;
+  from: string;
+  to: string;
   onToggle: () => void;
 }
 
@@ -99,14 +103,68 @@ function EventRow({
   rank,
   maxCount,
   expanded,
-  breakdown,
-  loading,
+  projectId,
+  from,
+  to,
   onToggle,
 }: EventRowProps) {
   const isCustom = row.type === "custom";
-  // Custom rows are expandable until they resolve to "no property data".
-  const expandable = isCustom && breakdown !== null;
   const fillClass = isCustom ? "bg-secondary" : "bg-primary";
+
+  // Per-row breakdown state — only touched once the row is expanded.
+  // undefined keys = not yet loaded; empty array = event has no property data.
+  const [keys, setKeys] = useState<string[] | undefined>(undefined);
+  const [keysLoading, setKeysLoading] = useState(false);
+  const [propKey, setPropKey] = useState("");
+  const [drill, setDrill] = useState<Record<string, string>>({});
+  const [cache, setCache] = useState<Record<string, EventPropBreakdown>>({});
+
+  // Cache breakdowns by key + active drill filters (mirrors the old lazy feel).
+  const cacheKey = `${propKey}|${JSON.stringify(drill)}`;
+  const breakdown = cache[cacheKey];
+
+  // First expand: load the available prop keys, default to tenant_id if present.
+  useEffect(() => {
+    if (!isCustom || !expanded || keys !== undefined || keysLoading) return;
+    setKeysLoading(true);
+    getEventPropKeysFn({ data: { projectId, from, to, name: row.name } })
+      .then((k) => {
+        setKeys(k);
+        setPropKey(k.includes("tenant_id") ? "tenant_id" : (k[0] ?? ""));
+      })
+      .catch(() => setKeys([]))
+      .finally(() => setKeysLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expanded]);
+
+  // (Re)load the breakdown whenever the chosen key or drill filters change.
+  useEffect(() => {
+    if (!propKey || cache[cacheKey] !== undefined) return;
+    getEventBreakdownFn({
+      data: { projectId, from, to, name: row.name, propKey, props: drill },
+    })
+      .then((res) => setCache((prev) => ({ ...prev, [cacheKey]: res })))
+      .catch(() =>
+        setCache((prev) => ({
+          ...prev,
+          [cacheKey]: { key: propKey, rows: [], hasMore: false },
+        })),
+      );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [propKey, cacheKey]);
+
+  function selectValue(r: RankedRow) {
+    if (r.filterValue == null) return;
+    setDrill((d) => ({ ...d, [propKey]: r.filterValue! }));
+  }
+
+  function removeChip(k: string) {
+    setDrill((d) => {
+      const next = { ...d };
+      delete next[k];
+      return next;
+    });
+  }
 
   const inner = (
     <div className="flex items-center gap-3 px-4 py-2.5">
@@ -137,7 +195,7 @@ function EventRow({
         {row.sharePct}%
       </span>
       <span className="w-4 shrink-0 text-center text-xs text-muted-foreground" aria-hidden>
-        {expandable ? (
+        {isCustom ? (
           <span className={`inline-block transition-transform ${expanded ? "rotate-90" : ""}`}>
             ▶
           </span>
@@ -148,7 +206,7 @@ function EventRow({
 
   return (
     <div className="border-b border-border last:border-0">
-      {expandable ? (
+      {isCustom ? (
         <button
           type="button"
           onClick={onToggle}
@@ -162,29 +220,60 @@ function EventRow({
 
       {expanded && (
         <div className="border-t-2 border-border bg-muted/30 px-4 py-3">
-          {loading ? (
+          {keys === undefined ? (
             <p className="text-sm text-muted-foreground">Loading breakdown…</p>
-          ) : breakdown ? (
-            <>
-              <div className="eyebrow mb-2">{breakdown.prop} breakdown</div>
-              <div className="flex flex-col gap-1">
-                {breakdown.dist.map((d) => (
-                  <div key={d.value} className="flex items-center gap-3">
-                    <span className="w-32 shrink-0 truncate text-sm" title={d.value}>
-                      {d.value}
-                    </span>
-                    <div className="h-1 flex-1 bg-muted">
-                      <div className="h-full bg-secondary" style={{ width: `${d.pct}%` }} />
-                    </div>
-                    <span className="w-10 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
-                      {d.pct}%
-                    </span>
-                  </div>
+          ) : keys.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No property data</p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="eyebrow" htmlFor={`bk-${row.name}`}>
+                  Break down by
+                </label>
+                <select
+                  id={`bk-${row.name}`}
+                  value={propKey}
+                  onChange={(e) => setPropKey(e.target.value)}
+                  className="border-2 border-border bg-background px-2 py-1 text-sm"
+                >
+                  {keys.map((k) => (
+                    <option key={k} value={k}>
+                      {k}
+                    </option>
+                  ))}
+                </select>
+                {Object.entries(drill).map(([k, v]) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => removeChip(k)}
+                    className="inline-flex items-center gap-1 border-2 border-border bg-secondary/15 px-2 py-0.5 text-xs font-medium text-secondary hover:bg-secondary/25"
+                  >
+                    {k}={v} <span aria-hidden>✕</span>
+                  </button>
                 ))}
               </div>
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground">No property data</p>
+              {breakdown ? (
+                <>
+                  <RankedList
+                    key={cacheKey}
+                    title={propKey}
+                    labelHeader="Value"
+                    items={breakdown.rows}
+                    countLabel="Events"
+                    emptyMessage="No values for this segment."
+                    onSelect={selectValue}
+                  />
+                  {breakdown.hasMore && (
+                    <p className="text-xs text-muted-foreground">
+                      Showing top 50 values.
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">Loading breakdown…</p>
+              )}
+            </div>
           )}
         </div>
       )}
@@ -195,7 +284,7 @@ function EventRow({
 // ── Table ─────────────────────────────────────────────────────────────────────
 
 /**
- * Keyed on `${from}|${to}` by the parent so expand state + breakdown cache
+ * Keyed on `${from}|${to}` by the parent so expand state + per-row breakdown
  * reset whenever the date range changes.
  */
 function EventsTable({
@@ -210,30 +299,8 @@ function EventsTable({
   rows: EventsRow[];
 }) {
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [cache, setCache] = useState<Record<string, EventBreakdown | null>>({});
-  const [loadingName, setLoadingName] = useState<string | null>(null);
 
   const maxCount = Math.max(1, ...rows.map((r) => r.count));
-
-  async function toggle(name: string) {
-    if (expanded === name) {
-      setExpanded(null);
-      return;
-    }
-    setExpanded(name);
-    // Fire the breakdown call once per event, then serve from cache.
-    if (cache[name] === undefined && loadingName !== name) {
-      setLoadingName(name);
-      try {
-        const res = await getEventBreakdownFn({
-          data: { projectId, from, to, name },
-        });
-        setCache((prev) => ({ ...prev, [name]: res ?? null }));
-      } finally {
-        setLoadingName(null);
-      }
-    }
-  }
 
   return (
     <div className="bg-card border-2 border-border">
@@ -262,9 +329,12 @@ function EventsTable({
             rank={i + 1}
             maxCount={maxCount}
             expanded={expanded === row.name}
-            breakdown={cache[row.name]}
-            loading={loadingName === row.name}
-            onToggle={() => toggle(row.name)}
+            projectId={projectId}
+            from={from}
+            to={to}
+            onToggle={() =>
+              setExpanded((e) => (e === row.name ? null : row.name))
+            }
           />
         ))
       )}
