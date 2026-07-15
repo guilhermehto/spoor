@@ -575,23 +575,78 @@ export async function queryEventCounts(
 
 // ── Event property breakdown ──────────────────────────────────────────────────
 
+export interface PropValueRow {
+  value: string;
+  count: number;
+}
+
 /**
- * For a single event `name` within [from, to], samples up to 2000 props-bearing
- * events, picks the most frequently-present top-level prop key whose values are
- * scalar (string/number/boolean), and returns its top 6 values as
- * `{ value, pct }` (pct of sampled events that carry the key), sorted desc.
- * Returns `null` when no events carry a scalar prop key.
- *
- * // ponytail: 2000-row JS sample; move to SQL jsonb aggregation if event volume grows.
+ * Exact per-value counts for a single top-level prop `key` of event `name`
+ * within [from, to], via SQL group-by (no sampling).  Optional `opts.props`
+ * narrows to events whose props jsonb contains those key/value pairs.
+ * Paginates via limit+1: hasMore is true when a further row exists.
  */
 export async function queryEventPropBreakdown(
   db: DB,
   projectId: string,
   range: DateRange,
   name: string,
-): Promise<{ prop: string; dist: Array<{ value: string; pct: number }> } | null> {
+  opts: { propKey: string; props?: Record<string, string>; limit?: number; offset?: number },
+): Promise<{ key: string; rows: PropValueRow[]; hasMore: boolean }> {
+  if (!opts.propKey) return { key: "", rows: [], hasMore: false };
+
+  const limit = opts.limit ?? 50;
+  const offset = opts.offset ?? 0;
+  const valueExpr = sql<string>`${analyticsEvents.props} ->> ${opts.propKey}`;
+  const propConds = Object.entries(opts.props ?? {}).map(
+    ([k, v]) => sql`${analyticsEvents.props} ->> ${k} = ${v}`,
+  );
+
   const rows = await db
-    .select({ props: analyticsEvents.props })
+    .select({
+      value: valueExpr,
+      total: count(analyticsEvents.id),
+    })
+    .from(analyticsEvents)
+    .where(
+      and(
+        eq(analyticsEvents.projectId, projectId),
+        eq(analyticsEvents.name, name),
+        gte(analyticsEvents.createdAt, range.from),
+        lte(analyticsEvents.createdAt, range.to),
+        sql`${analyticsEvents.props} ->> ${opts.propKey} is not null`,
+        ...propConds,
+      ),
+    )
+    // Group/order by ordinal: reusing the `props ->> key` fragment would emit a
+    // fresh bind-param each render, so Postgres treats SELECT vs GROUP BY as
+    // different expressions (error 42803). Col 1 = value, col 2 = count.
+    .groupBy(sql`1`)
+    .orderBy(sql`2 desc`, sql`1 asc`)
+    .limit(limit + 1)
+    .offset(offset);
+
+  const hasMore = rows.length > limit;
+  return {
+    key: opts.propKey,
+    rows: rows.slice(0, limit).map((r) => ({ value: String(r.value), count: Number(r.total) })),
+    hasMore,
+  };
+}
+
+/**
+ * Distinct top-level prop keys carried by event `name` within [from, to],
+ * sorted ascending.
+ */
+export async function queryEventPropKeys(
+  db: DB,
+  projectId: string,
+  range: DateRange,
+  name: string,
+): Promise<string[]> {
+  const keyExpr = sql<string>`jsonb_object_keys(${analyticsEvents.props})`;
+  const rows = await db
+    .selectDistinct({ key: keyExpr })
     .from(analyticsEvents)
     .where(
       and(
@@ -602,53 +657,8 @@ export async function queryEventPropBreakdown(
         sql`${analyticsEvents.props} is not null`,
       ),
     )
-    .limit(2000);
-
-  // Collect well-formed prop objects and count how often each scalar key appears.
-  const objects: Array<{ [key: string]: JsonValue }> = [];
-  const keyFreq = new Map<string, number>();
-  for (const r of rows) {
-    const props = r.props as { [key: string]: JsonValue } | null;
-    if (!props || typeof props !== "object" || Array.isArray(props)) continue;
-    objects.push(props);
-    for (const [k, v] of Object.entries(props)) {
-      const t = typeof v;
-      if (t === "string" || t === "number" || t === "boolean") {
-        keyFreq.set(k, (keyFreq.get(k) ?? 0) + 1);
-      }
-    }
-  }
-  if (keyFreq.size === 0) return null;
-
-  // Most frequent scalar key (Map preserves insertion order, so ties keep first-seen).
-  let prop = "";
-  let best = -1;
-  for (const [k, c] of keyFreq) {
-    if (c > best) {
-      prop = k;
-      best = c;
-    }
-  }
-
-  // Tally that key's scalar values over the events that carry it.
-  const valueFreq = new Map<string, number>();
-  let sampled = 0;
-  for (const props of objects) {
-    const v = props[prop];
-    const t = typeof v;
-    if (t !== "string" && t !== "number" && t !== "boolean") continue;
-    sampled++;
-    const key = String(v);
-    valueFreq.set(key, (valueFreq.get(key) ?? 0) + 1);
-  }
-  if (sampled === 0) return null;
-
-  const dist = [...valueFreq.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 6)
-    .map(([value, c]) => ({ value, pct: Math.round((c / sampled) * 100) }));
-
-  return { prop, dist };
+    .orderBy(asc(keyExpr));
+  return rows.map((r) => r.key);
 }
 
 // ── Session list ──────────────────────────────────────────────────────────────

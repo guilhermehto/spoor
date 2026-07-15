@@ -26,6 +26,7 @@ import {
   queryActiveVisitors,
   queryHasAnyEvents,
   queryEventPropBreakdown,
+  queryEventPropKeys,
   queryDeviceBreakdown,
   queryUtmBreakdown,
   type DateRange,
@@ -462,9 +463,10 @@ export const getEventsFn = createServerFn({ method: "GET" })
 
 // ── Event property breakdown ──────────────────────────────────────────────────
 
-export interface EventBreakdown {
-  prop: string;
-  dist: Array<{ value: string; pct: number }>;
+export interface EventPropBreakdown {
+  key: string;
+  rows: RankedRow[];
+  hasMore: boolean;
 }
 
 interface EventBreakdownInput {
@@ -472,15 +474,43 @@ interface EventBreakdownInput {
   from: string;
   to: string;
   name: string;
+  propKey: string;
+  props?: Record<string, string>;
+  offset?: number;
 }
 
 export const getEventBreakdownFn = createServerFn({ method: "GET" })
   .validator((data: EventBreakdownInput) => data)
-  .handler(async ({ data }): Promise<EventBreakdown | null> => {
+  .handler(async ({ data }): Promise<EventPropBreakdown> => {
     const session = await requireSession();
     await requireOwnedProject(db, data.projectId, session.user.id);
     const range: DateRange = { from: new Date(data.from), to: new Date(data.to) };
-    return queryEventPropBreakdown(db, data.projectId, range, data.name);
+    const result = await queryEventPropBreakdown(db, data.projectId, range, data.name, {
+      propKey: data.propKey,
+      ...(data.props !== undefined && { props: data.props }),
+      ...(data.offset !== undefined && { offset: data.offset }),
+    });
+    return {
+      key: result.key,
+      rows: result.rows.map((r) => ({ label: r.value, count: r.count, filterValue: r.value })),
+      hasMore: result.hasMore,
+    };
+  });
+
+interface EventPropKeysInput {
+  projectId: string;
+  from: string;
+  to: string;
+  name: string;
+}
+
+export const getEventPropKeysFn = createServerFn({ method: "GET" })
+  .validator((data: EventPropKeysInput) => data)
+  .handler(async ({ data }): Promise<string[]> => {
+    const session = await requireSession();
+    await requireOwnedProject(db, data.projectId, session.user.id);
+    const range: DateRange = { from: new Date(data.from), to: new Date(data.to) };
+    return queryEventPropKeys(db, data.projectId, range, data.name);
   });
 
 // ── Error groups ──────────────────────────────────────────────────────────────
