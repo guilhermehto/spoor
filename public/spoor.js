@@ -3,6 +3,7 @@
  * Usage: <script defer src="/spoor.js" data-project="<publicKey>"></script>
  * Emits: pageview (load + SPA nav), click ([data-track]), custom (window.spoor.track),
  *        error (window error + unhandledrejection)
+ * Global props: window.spoor.identify(props) attaches props to every event; clearIdentify() resets.
  */
 (function () {
   "use strict";
@@ -20,9 +21,32 @@
   var projectKey = scriptEl ? scriptEl.getAttribute("data-project") : "";
   if (!projectKey) return;
 
+  // Global props merged under every payload's own props (identify/clearIdentify).
+  var defaultProps = {};
+
   // ── Send ──────────────────────────────────────────────────────────────────
 
   function send(payload) {
+    var merged = {};
+    var key;
+    var hasProps = false;
+    for (key in defaultProps) {
+      if (Object.prototype.hasOwnProperty.call(defaultProps, key)) {
+        merged[key] = defaultProps[key];
+        hasProps = true;
+      }
+    }
+    if (payload.props) {
+      for (key in payload.props) {
+        if (Object.prototype.hasOwnProperty.call(payload.props, key)) {
+          merged[key] = payload.props[key];
+          hasProps = true;
+        }
+      }
+    }
+    if (hasProps) {
+      payload.props = merged;
+    }
     var body = JSON.stringify(payload);
     try {
       if (navigator.sendBeacon) {
@@ -103,6 +127,17 @@
         payload.props = props;
       }
       send(payload);
+    },
+    identify: function (props) {
+      if (!props || typeof props !== "object" || Array.isArray(props)) return;
+      for (var key in props) {
+        if (Object.prototype.hasOwnProperty.call(props, key)) {
+          defaultProps[key] = props[key];
+        }
+      }
+    },
+    clearIdentify: function () {
+      defaultProps = {};
     },
   };
 

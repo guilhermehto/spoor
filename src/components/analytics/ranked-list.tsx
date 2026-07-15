@@ -35,6 +35,8 @@ interface RankedListProps {
   items: RankedRow[];
   emptyMessage?: string;
   countLabel?: string;
+  /** Left-column header; defaults to "Path / Source" for page/referrer lists. */
+  labelHeader?: string;
   /** When true, a "Show more" button is rendered (requires pagination props). */
   hasMore?: boolean;
   /** Called when a row is clicked; when absent rows are non-interactive. */
@@ -50,6 +52,7 @@ export function RankedList({
   items: initialItems,
   emptyMessage = "No data for this period.",
   countLabel = "Views",
+  labelHeader = "Path / Source",
   hasMore: initialHasMore = false,
   onSelect,
   pagination,
@@ -94,7 +97,7 @@ export function RankedList({
         ) : (
           <div className="space-y-2">
             <div className="flex justify-between text-xs font-medium text-muted-foreground mb-1">
-              <span>Path / Source</span>
+              <span>{labelHeader}</span>
               <span>{countLabel}</span>
             </div>
             {items.map((item, i) => {

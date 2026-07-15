@@ -106,6 +106,25 @@ After creating a project, copy the snippet from the **Setup** page:
 window.spoor.track('signup', { plan: 'pro' });
 ```
 
+### Global properties (multi-tenant segmentation)
+
+Call `identify` once (e.g. after login) to attach properties — such as tenant
+and user ids — to **every** subsequent event, including automatic page views
+and `data-track` clicks. Per-call `track` props override globals on key clash.
+
+```js
+window.spoor.identify({ tenant_id: 'acme', user_id: 'u_123' });
+window.spoor.clearIdentify(); // drop globals, e.g. on logout
+```
+
+Break usage down by any global/custom property in the dashboard's **Events**
+view: expand a custom event, pick a key (e.g. `tenant_id`), then click a value
+to drill in and segment by another key (e.g. `user_id`).
+
+> **Privacy:** values passed to `identify`/`track` are stored verbatim in the
+> analytics database. Send stable ids (tenant/user), not raw PII like emails or
+> names. Retention still honours `SPOOR_RETENTION_DAYS`.
+
 ### Declarative click tracking
 
 ```html
