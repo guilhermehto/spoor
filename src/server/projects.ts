@@ -37,22 +37,6 @@ export const createProjectFn = createServerFn({ method: "POST" })
     return project;
   });
 
-export const getProjectFn = createServerFn({ method: "GET" })
-  .validator((data: { projectId: string }) => data)
-  .handler(async ({ data }) => {
-    const session = await requireSession();
-    const [project] = await db
-      .select()
-      .from(projects)
-      .where(
-        and(
-          eq(projects.id, data.projectId),
-          eq(projects.userId, session.user.id),
-        ),
-      );
-    return project ?? null;
-  });
-
 export const deleteProjectFn = createServerFn({ method: "POST" })
   .validator((data: { projectId: string }) => data)
   .handler(async ({ data }) => {

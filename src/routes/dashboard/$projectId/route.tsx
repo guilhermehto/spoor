@@ -7,7 +7,7 @@ import {
   useNavigate,
 } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
-import { getProjectFn, listProjectsFn } from "~/server/projects";
+import { listProjectsFn } from "~/server/projects";
 import {
   buildRange,
   detectPreset,
@@ -34,15 +34,17 @@ function validateSearch(search: Record<string, unknown>): ProjectSearch {
 
 export const Route = createFileRoute("/dashboard/$projectId")({
   validateSearch,
-  beforeLoad: async ({ params }) => {
-    const project = await getProjectFn({ data: { projectId: params.projectId } });
+  // One round trip: the projects list powers the sidebar switcher AND the
+  // current-project lookup, and runs in parallel with child page loaders
+  // (unlike beforeLoad, which serializes parent → child).
+  loader: async ({ params }) => {
+    const projects = await listProjectsFn();
+    const project = projects.find((p) => p.id === params.projectId);
     if (!project) {
       throw notFound();
     }
-    return { project };
+    return { projects, project };
   },
-  // Projects list powers the sidebar switcher.
-  loader: async () => ({ projects: await listProjectsFn() }),
   component: ProjectLayout,
   notFoundComponent: () => (
     <div className="space-y-2">
@@ -130,8 +132,7 @@ const RANGES: Preset[] = ["24h", "7d", "30d", "90d"];
 // ── Shell ───────────────────────────────────────────────────────────────────
 
 function ProjectLayout() {
-  const { project } = Route.useRouteContext();
-  const { projects } = Route.useLoaderData();
+  const { projects, project } = Route.useLoaderData();
   const search = Route.useSearch();
   const navigate = useNavigate();
   const { pathname } = useLocation();

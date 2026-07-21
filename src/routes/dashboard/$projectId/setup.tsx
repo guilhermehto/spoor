@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, getRouteApi, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
@@ -9,7 +9,7 @@ export const Route = createFileRoute("/dashboard/$projectId/setup")({
 });
 
 function SetupPage() {
-  const { project } = Route.useRouteContext();
+  const { project } = getRouteApi("/dashboard/$projectId").useLoaderData();
   const [copied, setCopied] = useState(false);
 
   const appUrl =
