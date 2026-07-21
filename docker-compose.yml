@@ -20,7 +20,7 @@ services:
       db:
         condition: service_healthy
     ports:
-      - "${PORT:-3000}:3000"
+      - "127.0.0.1:${PORT:-3000}:3000"
     environment:
       DATABASE_URL: postgres://spoor:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/spoor
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET must be set}
